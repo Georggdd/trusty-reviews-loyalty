@@ -1,0 +1,16 @@
+api_version = "2025-07"
+
+[[extensions]]
+name = "Trusty Loyalty (Checkout)"
+handle = "trusty-loyalty-checkout"
+type = "ui_extension"
+surface = "checkout"
+description = "Loyalty points widget in the checkout."
+
+[extensions.capabilities]
+api_access = true
+network_access = true
+
+[[extensions.targeting]]
+module = "./src/index.tsx"
+target = "purchase.checkout.block.render"
