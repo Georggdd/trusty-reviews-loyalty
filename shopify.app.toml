@@ -1,0 +1,21 @@
+# Learn more about configuring your app at https://shopify.dev/docs/apps/tools/cli/configuration
+
+client_id = "52677cd3d89cafe7674707ba8530689d"
+name = "Trusty-reviews-loyalty"
+application_url = "https://trusty-rewards-reviews.lovable.app/"
+embedded = false
+handle = "trusty-reviews-loyalty"
+
+[build]
+include_config_on_deploy = true
+
+[webhooks]
+api_version = "2025-07"
+
+[auth]
+redirect_urls = [
+  "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/auth_callback"
+]
+
+[pos]
+embedded = false

@@ -1,0 +1,20 @@
+# Config de la extensión de Cuentas de cliente
+# Tu CLI requiere type="ui_extension" + surface="customer_accounts"
+
+api_version = "2025-07"
+
+[[extensions]]
+name = "Trusty Loyalty"
+handle = "trusty-loyalty"
+type = "ui_extension"
+surface = "customer_accounts"
+description = "Loyalty points widget on the customer account order index page."
+
+[extensions.capabilities]
+api_access = true
+network_access = true
+
+# Target: LISTADO de pedidos del portal de cuentas
+[[extensions.targeting]]
+module = "./src/OrderStatusBlock.tsx"
+target = "customer-account.order-index.block.render"
