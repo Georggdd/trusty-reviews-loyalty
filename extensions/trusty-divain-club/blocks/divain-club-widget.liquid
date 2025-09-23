@@ -1,0 +1,34 @@
+{% comment %}
+Bloque principal del widget Divain Club.
+- Pinta un contenedor vacío.
+- Carga JS/CSS del widget.
+- Pasa el dominio de la tienda al JS vía data-atributos.
+{% endcomment %}
+
+
+<div id="trusty-divain-club"
+data-shop="{{ shop.permanent_domain | escape }}"
+data-locale="{{ request.locale.iso_code }}">
+<div class="trusty-dc-loading">Cargando Divain Club…</div>
+<noscript>Activa JavaScript para ver el contenido.</noscript>
+</div>
+
+
+{{ 'trusty-divain-club.css' | asset_url | stylesheet_tag }}
+{{ 'trusty-divain-club.js' | asset_url | script_tag }}
+
+
+{% schema %}
+{
+"name": "Trusty Divain Club",
+"target": "section",
+"settings": [
+{"type": "text", "id": "title_override", "label": "Título (opcional)", "default": "DIVAIN Club"},
+{"type": "checkbox", "id": "show_how", "label": "Mostrar 'Cómo funciona'", "default": true},
+{"type": "checkbox", "id": "show_earn", "label": "Mostrar 'Formas de ganar'", "default": true},
+{"type": "checkbox", "id": "show_redeem", "label": "Mostrar 'Formas de canjear'", "default": true}
+],
+"blocks": [],
+"presets": [{"name": "Trusty Divain Club"}]
+}
+{% endschema %}

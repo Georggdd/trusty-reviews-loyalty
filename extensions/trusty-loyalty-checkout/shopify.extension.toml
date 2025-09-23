@@ -3,6 +3,7 @@ api_version = "2025-07"
 [[extensions]]
 name = "Trusty Loyalty (Checkout)"
 handle = "trusty-loyalty-checkout"
+uid = "87a16a21-7cce-141d-b282-ce6c34a2acbe0b2c04f5"
 type = "ui_extension"
 surface = "checkout"
 description = "Loyalty points widget in the checkout."
