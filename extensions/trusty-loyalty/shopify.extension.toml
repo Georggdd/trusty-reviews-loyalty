@@ -1,7 +1,7 @@
 # Config de la extensión de Cuentas de cliente
 # Tu CLI requiere 
 uid = "3ad19a45-5e3c-f06b-a6bb-5deb04eb3d578d40813a"
- type="ui_extension" + surface="customer_accounts"
+ type="ui_extension" 
 
 api_version = "2025-07"
 
