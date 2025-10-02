@@ -3,9 +3,14 @@ import {
   reactExtension,
   Text,
   BlockStack,
+  InlineStack,
   useApi,
   TextField,
   Button,
+  Divider,
+  Icon,
+  Pressable,
+  View,
 } from "@shopify/ui-extensions-react/customer-account";
 import {
   useAuthenticatedAccountCustomer as useAuthenticatedCustomer,
@@ -516,99 +521,210 @@ function LoyaltyWidget() {
       ) : (
         <>
           {/* ═══════════════════════════════════════════ */}
-          {/*           SECCIÓN DE PUNTOS MEJORADA        */}
+          {/*           SECCIÓN DE PUNTOS PREMIUM         */}
           {/* ═══════════════════════════════════════════ */}
-          <BlockStack spacing="loose">
-            {/* Saldo de puntos destacado */}
-            <BlockStack spacing="tight">
-              <Text emphasis="bold" size="large">Tu saldo de puntos: {state.balance ?? 0}</Text>
-              <Text appearance="subdued">Canjea tus puntos por descuentos exclusivos</Text>
-            </BlockStack>
-
-            {/* Campo de canje con mejor diseño */}
-            <BlockStack spacing="tight">
-              <TextField
-                label="Puntos a canjear"
-                type="number"
-                value={state.points}
-                onChange={(value) => setState((prev) => ({ ...prev, points: value }))}
-              />
-              
-              <Button kind="primary" onPress={handleRedeem}>
-                Canjear
-              </Button>
-            </BlockStack>
-
-            {/* Mensajes de estado mejorados */}
-            {state.msg && (
-              <BlockStack spacing="tight">
-                <Text emphasis="bold">{state.msg}</Text>
-              </BlockStack>
-            )}
-
-            {/* Código generado con mejor presentación */}
-            {state.generatedCode && (
-              <BlockStack spacing="tight">
-                <Text emphasis="bold" size="large">🎉 ¡Código generado!</Text>
+          <View 
+            border="base" 
+            cornerRadius="large" 
+            padding="base"
+          >
+            <BlockStack spacing="base">
+              {/* Header con saldo destacado */}
+              <InlineStack spacing="tight" blockAlignment="center">
+                <Text size="extraLarge" emphasis="bold">💎</Text>
                 <BlockStack spacing="extraTight">
-                  <Text emphasis="bold" size="medium">{state.generatedCode}</Text>
-                  {state.amount != null && (
-                    <Text appearance="success">
-                      Vale por {String(state.amount)}€
-                      {state.expiresAt ? ` · Caduca: ${state.expiresAt}` : ""}
-                    </Text>
-                  )}
+                  <Text emphasis="bold" size="large">
+                    {state.balance ?? 0} Puntos
+                  </Text>
+                  <Text appearance="subdued" size="small">
+                    Tu saldo disponible
+                  </Text>
                 </BlockStack>
-                <Button kind="secondary" onPress={() => copyCodeToClipboard(state.generatedCode!)}>
-                  📋 Copiar código
-                </Button>
+              </InlineStack>
+
+              <Divider />
+
+              {/* Campo de canje moderno */}
+              <BlockStack spacing="base">
+                <Text emphasis="bold">💰 Canjear Puntos</Text>
+                <InlineStack spacing="base" blockAlignment="end">
+                  <BlockStack spacing="extraTight">
+                    <TextField
+                      label="Cantidad de puntos"
+                      type="number"
+                      value={state.points}
+                      onChange={(value) => setState((prev) => ({ ...prev, points: value }))}
+                    />
+                  </BlockStack>
+                  <Button 
+                    kind="secondary" 
+                    onPress={handleRedeem}
+                    appearance="monochrome"
+                  >
+                    ✨ Canjear
+                  </Button>
+                </InlineStack>
               </BlockStack>
-            )}
-          </BlockStack>
 
-          {/* ═══════════════════════════════════════════ */}
-          {/*      SECCIÓN DE CUMPLEAÑOS MEJORADA         */}
-          {/* ═══════════════════════════════════════════ */}
-          <BlockStack spacing="loose">
-            {/* Encabezado de cumpleaños atractivo */}
-            <BlockStack spacing="tight">
-              <Text emphasis="bold" size="large">🎂 ¡Celebra tu cumpleaños!</Text>
-              <Text>Pon tu fecha de nacimiento y recibe 15 puntos como regalo de cumpleaños</Text>
-            </BlockStack>
-
-            {/* Estado actual si ya tiene fecha */}
-            {state.existingDob && (
-              <BlockStack spacing="tight">
-                <Text emphasis="bold">Ya tenemos tu fecha: {state.existingDob}</Text>
-                <Text appearance="success">✅ ¡Recibirás 15 puntos en tu cumpleaños!</Text>
-              </BlockStack>
-            )}
-
-            {/* Formulario de fecha de nacimiento */}
-            {!state.existingDob && (
-              <BlockStack spacing="tight">
-                <TextField
-                  label="Fecha de nacimiento (DD-MM-YYYY)"
-                  value={state.dob}
-                  onChange={(value) => setState((p) => ({ ...p, dob: value }))}
-                  disabled={!!state.existingDob}
-                />
-                
-                <Button 
-                  kind="secondary" 
-                  onPress={handleSaveDob} 
-                  disabled={!!state.existingDob || state.dobSaving}
+              {/* Mensajes de estado elegantes */}
+              {state.msg && (
+                <View 
+                  border="base" 
+                  cornerRadius="base" 
+                  padding="tight"
                 >
-                  {state.existingDob ? "✅ Guardada" : state.dobSaving ? "Guardando…" : "🎁 Guardar"}
-                </Button>
-              </BlockStack>
-            )}
+                  <Text emphasis="bold">{state.msg}</Text>
+                </View>
+              )}
 
-            {/* Mensajes de estado para DOB */}
-            {state.dobMsg && (
-              <Text appearance="critical">{state.dobMsg}</Text>
-            )}
-          </BlockStack>
+              {/* Código generado con diseño premium */}
+              {state.generatedCode && (
+                <View 
+                  border="base" 
+                  cornerRadius="large" 
+                  padding="base"
+                >
+                  <BlockStack spacing="tight" inlineAlignment="center">
+                    <Text size="large" emphasis="bold">🎉 ¡Código Generado!</Text>
+                    
+                    <View 
+                      border="base" 
+                      cornerRadius="base" 
+                      padding="tight"
+                    >
+                      <Text 
+                        emphasis="bold" 
+                        size="medium"
+                      >
+                        {state.generatedCode}
+                      </Text>
+                    </View>
+                    
+                    {state.amount != null && (
+                      <Text appearance="success" size="small">
+                        💰 Vale por {String(state.amount)}€
+                        {state.expiresAt ? ` • Caduca: ${state.expiresAt}` : ""}
+                      </Text>
+                    )}
+                    
+                    <Button 
+                      kind="secondary" 
+                      onPress={() => copyCodeToClipboard(state.generatedCode!)}
+                      appearance="monochrome"
+                    >
+                      📋 Copiar Código
+                    </Button>
+                  </BlockStack>
+                </View>
+              )}
+            </BlockStack>
+          </View>
+
+          {/* ═══════════════════════════════════════════ */}
+          {/*      SECCIÓN DE CUMPLEAÑOS PREMIUM          */}
+          {/* ═══════════════════════════════════════════ */}
+          <View 
+            border="base" 
+            cornerRadius="large" 
+            padding="base"
+          >
+            <BlockStack spacing="base">
+              {/* Header de cumpleaños con estilo */}
+              <InlineStack spacing="tight" blockAlignment="center">
+                <Text size="extraLarge">🎂</Text>
+                <BlockStack spacing="extraTight">
+                  <Text emphasis="bold" size="large">
+                    ¡Celebra tu Cumpleaños!
+                  </Text>
+                  <Text appearance="subdued" size="small">
+                    Recibe 15 puntos de regalo
+                  </Text>
+                </BlockStack>
+              </InlineStack>
+
+              <Divider />
+
+              {/* Estado cuando ya tiene fecha guardada */}
+              {state.existingDob ? (
+                <BlockStack spacing="tight" inlineAlignment="center">
+                  <View 
+                    border="base" 
+                    cornerRadius="base" 
+                    padding="base"
+                  >
+                    <BlockStack spacing="tight" inlineAlignment="center">
+                      <Text size="large">✅</Text>
+                      <Text emphasis="bold">
+                        Fecha Guardada
+                      </Text>
+                      <Text size="small">
+                        {state.existingDob}
+                      </Text>
+                      <Text appearance="success" size="small">
+                        🎁 ¡Recibirás puntos en tu cumpleaños!
+                      </Text>
+                    </BlockStack>
+                  </View>
+                  
+                  {/* Botón deshabilitado con estilo grisáceo */}
+                  <Button 
+                    kind="secondary" 
+                    disabled={true}
+                  >
+                    ✅ Fecha Guardada
+                  </Button>
+                </BlockStack>
+              ) : (
+                /* Formulario activo con diseño moderno */
+                <BlockStack spacing="base">
+                  <Text emphasis="bold">📅 Tu Fecha de Nacimiento</Text>
+                  
+                  <InlineStack spacing="base" blockAlignment="end">
+                    <BlockStack spacing="extraTight">
+                      <TextField
+                        label="Fecha (DD-MM-YYYY)"
+                        value={state.dob}
+                        onChange={(value) => setState((p) => ({ ...p, dob: value }))}
+                        disabled={state.dobSaving}
+                      />
+                    </BlockStack>
+                    <Button 
+                      kind="secondary" 
+                      onPress={handleSaveDob} 
+                      disabled={state.dobSaving}
+                      appearance="monochrome"
+                    >
+                      {state.dobSaving ? "⏳ Guardando..." : "🎁 Guardar"}
+                    </Button>
+                  </InlineStack>
+
+                  {/* Mensaje motivacional */}
+                  <View 
+                    border="base" 
+                    cornerRadius="base" 
+                    padding="tight"
+                  >
+                    <Text size="small" appearance="subdued">
+                      💡 Ejemplo: 02-10-2000
+                    </Text>
+                  </View>
+                </BlockStack>
+              )}
+
+              {/* Mensajes de error elegantes */}
+              {state.dobMsg && (
+                <View 
+                  border="base" 
+                  cornerRadius="base" 
+                  padding="tight"
+                >
+                  <Text appearance="critical" size="small">
+                    ⚠️ {state.dobMsg}
+                  </Text>
+                </View>
+              )}
+            </BlockStack>
+          </View>
 
           {SHOW_DEBUG && (
             <Text>
