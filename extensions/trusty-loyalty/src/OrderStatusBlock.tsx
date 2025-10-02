@@ -43,7 +43,7 @@ function isCustomizerPreview(): boolean {
     q.includes("profile_preview_token") ||
     bodyText.includes("close preview") ||
     bodyText.includes("divain-test-dev-store configuration") ||
-    bodyText.includes("you’re viewing:")
+    bodyText.includes("you're viewing:")
   );
 }
 
@@ -85,12 +85,14 @@ function LoyaltyWidget() {
     error: string | null;
     points: string;
     msg: string | null;
-    generatedCode: string | null; // ← para pintar en negrita
+    generatedCode: string | null;
+    amount: number | null;
+    expiresAt: string | null;
     // DOB UI
-    dob: string; // "YYYY-MM-DD"
+    dob: string;
     dobSaving: boolean;
     dobMsg: string | null;
-    existingDob: string | null; // para pintar si ya hay una fecha guardada
+    existingDob: string | null;
     debug: {
       runtimeGid: string | null;
       runtimeNumeric: string | null;
@@ -109,6 +111,8 @@ function LoyaltyWidget() {
     points: "",
     msg: null,
     generatedCode: null,
+    amount: null,
+    expiresAt: null,
     // DOB UI
     dob: "",
     dobSaving: false,
@@ -129,37 +133,38 @@ function LoyaltyWidget() {
   const shopDomain = "sandboxdivain.myshopify.com"; // TODO: parametrizar en prod
 
   const SUPABASE_EDGE = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1";
-
   async function fetchBalance(usedGid: string | null) {
     try {
       const { numeric } = normalizeCustomerId(usedGid);
-      const qs = new URLSearchParams({
-        shopify_customer_gid: usedGid ?? "",
-        shopify_customer_id: numeric ?? "",
-      });
-      const res = await fetch(`${SUPABASE_EDGE}/loyalty_balance_ui?` + qs.toString());
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const json = await res.json();
-      setState((prev) => ({
-        ...prev,
-        balance: typeof json?.balance === "number" ? json.balance : 0,
-        error: null,
-      }));
+      if (!numeric) throw new Error("Sin sesión de cliente.");
+  
+      // loyalty_balance_ui espera el ID numérico (o el GID). No usa token.
+      const url = new URL(`${SUPABASE_EDGE}/loyalty_balance_ui`);
+      url.searchParams.set("shopify_customer_id", numeric);
+  
+      const res = await fetch(url.toString(), { method: "GET" });
+      const json = await res.json().catch(() => ({} as any));
+  
+      if (!res.ok || typeof json?.balance !== "number") {
+        console.warn("loyalty_balance_ui error", res.status, json);
+        throw new Error(json?.error || `HTTP ${res.status}`);
+      }
+  
+      setState((prev) => ({ ...prev, balance: json.balance, error: null }));
     } catch {
       setState((prev) => ({ ...prev, error: "No se pudo cargar el saldo" }));
     }
-  }
+  }   
 
   async function fetchExistingDob(usedGid: string | null) {
     try {
       const { numeric } = normalizeCustomerId(usedGid);
       if (!numeric) return;
-      // Endpoint de lectura ligera del perfil del cliente (a implementar en Edge): get_customer_profile_ui
       const url = new URL(`${SUPABASE_EDGE}/get_customer_profile_ui`);
       url.searchParams.set("shop_domain", shopDomain);
       url.searchParams.set("shopify_customer_id", numeric);
       const res = await fetch(url.toString(), { method: "GET" });
-      if (!res.ok) return; // si no existe aún, seguimos sin bloquear la UI
+      if (!res.ok) return;
       const j = await res.json();
       if (j?.date_of_birth) {
         const [y, m, d] = String(j.date_of_birth).split("-");
@@ -167,7 +172,7 @@ function LoyaltyWidget() {
         setState((p) => ({ ...p, existingDob: ddmmyyyy, dob: ddmmyyyy }));
       }
     } catch {
-      // silencio: no bloquea la UI
+      // silencio
     }
   }
 
@@ -189,6 +194,8 @@ function LoyaltyWidget() {
             points: "",
             msg: null,
             generatedCode: null,
+            amount: null,
+            expiresAt: null,
             dob: "",
             dobSaving: false,
             dobMsg: null,
@@ -252,6 +259,8 @@ function LoyaltyWidget() {
               points: "",
               msg: null,
               generatedCode: null,
+              amount: null,
+              expiresAt: null,
               dob: "",
               dobSaving: false,
               dobMsg: null,
@@ -275,10 +284,7 @@ function LoyaltyWidget() {
           return;
         }
 
-        await Promise.all([
-          fetchBalance(usedGid),
-          fetchExistingDob(usedGid),
-        ]);
+        await Promise.all([fetchBalance(usedGid), fetchExistingDob(usedGid)]);
 
         if (!cancelled) {
           setState((prev) => ({
@@ -322,34 +328,34 @@ function LoyaltyWidget() {
     return usp.toString();
   };
 
-  // Padding sin padStart (evita exigir es2017)
   const pad = (n: number | string, len: number) => {
     const s = String(n);
     return (Array(len + 1).join("0") + s).slice(-len);
   };
 
-  // Helper para normalizar entrada de fecha a ISO
   function normalizeDobInputToISO(input: string): { ok: true; iso: string } | { ok: false; error: string } {
     if (!input) return { ok: false, error: "vacío" };
     let s = input.trim();
-    // Acepta DD-MM-YYYY, DD/MM/YYYY, DD.MM.YYYY, DDMMYYYY, D-M-YYYY
     s = s.replace(/[\.\/]/g, "-").replace(/\s+/g, "");
-    if (/^\d{8}$/.test(s)) s = `${s.slice(0,2)}-${s.slice(2,4)}-${s.slice(4)}`; // DDMMYYYY → DD-MM-YYYY
+    if (/^\d{8}$/.test(s)) s = `${s.slice(0, 2)}-${s.slice(2, 4)}-${s.slice(4)}`;
     const m = s.match(/^(\d{1,2})-(\d{1,2})-(\d{4})$/);
     if (!m) return { ok: false, error: "formato" };
-    const dd = Number(m[1]), mm = Number(m[2]), yyyy = Number(m[3]);
+    const dd = Number(m[1]),
+      mm = Number(m[2]),
+      yyyy = Number(m[3]);
     if (!(mm >= 1 && mm <= 12)) return { ok: false, error: "mes" };
     if (!(dd >= 1 && dd <= 31)) return { ok: false, error: "día" };
     const daysInMonth = new Date(yyyy, mm, 0).getDate();
     if (dd > daysInMonth) return { ok: false, error: "día-mes" };
-    const iso = `${pad(yyyy,4)}-${pad(mm,2)}-${pad(dd,2)}`;
-    const dt = new Date(iso), today = new Date();
+    const iso = `${pad(yyyy, 4)}-${pad(mm, 2)}-${pad(dd, 2)}`;
+    const dt = new Date(iso),
+      today = new Date();
     if (Number.isNaN(+dt) || dt > today) return { ok: false, error: "fecha" };
     return { ok: true, iso };
   }
 
-  async function getTokenForCustomer(): Promise<string> {
-    const usedGid = state.debug.usedGid;
+  async function getTokenForCustomer(usedGidParam?: string | null): Promise<string> {
+    const usedGid = usedGidParam ?? state.debug.usedGid;
     const { numeric } = normalizeCustomerId(usedGid);
     if (!usedGid || !numeric) throw new Error("Sin sesión de cliente.");
     const tokUrl = new URL(`${SUPABASE_EDGE}/sign_loyalty_link`);
@@ -361,63 +367,58 @@ function LoyaltyWidget() {
       throw new Error(tok?.error || "No se pudo obtener autorización.");
     }
     return tok.token as string;
-  }
+  }  
 
   async function handleRedeem() {
     try {
-      setState((prev) => ({ ...prev, msg: null, generatedCode: null }));
-
-      const usedGid = state.debug.usedGid;
-      const { numeric } = normalizeCustomerId(usedGid);
+      setState((prev) => ({ ...prev, msg: null, generatedCode: null, amount: null, expiresAt: null }));
+  
+      // Usa el GID que ya está resuelto en debug; si faltara, cae al runtime
+      const usedGidLocal = state.debug.usedGid ?? runtimeGid;
+      const { numeric } = normalizeCustomerId(usedGidLocal);
       const points = parseInt(state.points, 10);
-
-      if (!usedGid || !numeric) throw new Error("Sin sesión de cliente.");
+  
+      if (!usedGidLocal || !numeric) throw new Error("Sin sesión de cliente.");
       if (!Number.isInteger(points) || points <= 0) {
         setState((prev) => ({ ...prev, msg: "Introduce un número de puntos válido." }));
         return;
       }
-
-      const token = await getTokenForCustomer();
-
-      // (1) Preflight lógico
-      const preRes = await fetch(
-        `${SUPABASE_EDGE}/redeem_points?preflight=true&shop=${shopDomain}`,
-        { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: formEncode({ token, points }) }
-      );
-      const pj = await preRes.json();
-      if (!preRes.ok || !pj?.ok) {
-        const err = pj?.error || "Error preflight";
-        if (err === "min_redeem_not_met") {
-          setState((p) => ({ ...p, msg: `Debes canjear al menos ${pj.min_redeem} puntos.` }));
-          return;
-        }
-        if (err === "insufficient_balance") {
-          setState((p) => ({ ...p, msg: `Saldo insuficiente. Tienes ${pj.currentBalance} puntos.` }));
-          return;
-        }
-        throw new Error(err);
-      }
-
-      // (2) Canje real
+  
+      const token = await getTokenForCustomer(usedGidLocal);
+  
       const redRes = await fetch(
-        `${SUPABASE_EDGE}/redeem_points?shop=${shopDomain}`,
+        `${SUPABASE_EDGE}/redeem_discount_code?shop=${shopDomain}`,
         { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: formEncode({ token, points }) }
       );
-      const rj = await redRes.json();
-      if (!redRes.ok || !rj?.ok) {
-        throw new Error(rj?.error || "No se pudo canjear.");
+      const rj = await redRes.json().catch(() => ({} as any));
+  
+      const ok = redRes.ok && ((rj?.ok === true) || (rj?.success === true));
+      if (!ok) {
+        const err = (rj?.error || "").toString();
+        if (err === "no_redemption_option") { setState((p) => ({ ...p, msg: rj.message || `No hay opción de canje para ${points} puntos.` })); return; }
+        if (err === "Insufficient points" || err === "INSUFFICIENT_BALANCE") { setState((p) => ({ ...p, msg: `Saldo insuficiente. Tienes ${rj.available} puntos, necesitas ${rj.required}.` })); return; }
+        if (err === "invalid_token") { setState((p) => ({ ...p, msg: `Token inválido. Cierra sesión y vuelve a entrar.` })); return; }
+        throw new Error(err || `No se pudo canjear (HTTP ${redRes.status}).`);
       }
-
-      // (3) Mensaje + refrescar saldo (con negrita para el código)
-      setState((prev) => ({
-        ...prev,
-        msg: "Código generado:",
-        generatedCode: rj.discount_code,
-        points: "",
-      }));
-      await fetchBalance(usedGid);
+  
+      const code = rj.discount_code ?? rj.code ?? null;
+      const amount = (typeof rj.amount === "number" ? rj.amount : typeof rj.discount_amount === "number" ? rj.discount_amount : null);
+      const expiresAt = rj.expires_at ?? rj.expiry ?? null;
+  
+      setState((prev) => ({ ...prev, msg: "Código de descuento generado:", generatedCode: code, amount, expiresAt, points: "" }));
+  
+      await fetchBalance(usedGidLocal);
     } catch (e: any) {
       setState((prev) => ({ ...prev, msg: e?.message || "Error en el canje." }));
+    }
+  }  
+
+  async function copyCodeToClipboard(code: string) {
+    try {
+      await (navigator as any)?.clipboard?.writeText(code);
+      setState((p) => ({ ...p, msg: "Código copiado al portapapeles ✅" }));
+    } catch {
+      setState((p) => ({ ...p, msg: "No se pudo copiar. Copia manualmente." }));
     }
   }
 
@@ -429,7 +430,7 @@ function LoyaltyWidget() {
     const dt = new Date(yyyyMmDd);
     if (Number.isNaN(+dt)) return false;
     const today = new Date();
-    if (dt > today) return false; // no futuro
+    if (dt > today) return false;
     return true;
   }
 
@@ -438,10 +439,14 @@ function LoyaltyWidget() {
       setState((p) => ({ ...p, dobSaving: true, dobMsg: null }));
       const parsed = normalizeDobInputToISO(state.dob);
       if (!parsed.ok) {
-        setState((p) => ({ ...p, dobSaving: false, dobMsg: "Formato esperado DD-MM-YYYY (admite 01011990, 01/01/1990, 01.01.1990)." }));
+        setState((p) => ({
+          ...p,
+          dobSaving: false,
+          dobMsg: "Formato esperado DD-MM-YYYY (admite 01011990, 01/01/1990, 01.01.1990).",
+        }));
         return;
       }
-      const dobISO = parsed.iso; // guardar en DB como YYYY-MM-DD
+      const dobISO = parsed.iso;
 
       const token = await getTokenForCustomer();
       const res = await fetch(`${SUPABASE_EDGE}/set_date_of_birth`, {
@@ -449,13 +454,18 @@ function LoyaltyWidget() {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({ token, date_of_birth: dobISO, shop_domain: shopDomain }).toString(),
       });
-      const j = await res.json().catch(() => ({}));
+      const j = await res.json().catch(() => ({} as any));
       if (!res.ok || j?.ok === false) throw new Error(j?.error || `Error HTTP ${res.status}`);
 
-      // Mostrar en UI como DD-MM-YYYY
       const [y, m, d] = dobISO.split("-");
       const ddmmyyyy = `${d}-${m}-${y}`;
-      setState((p) => ({ ...p, dobSaving: false, dobMsg: "Fecha guardada", existingDob: ddmmyyyy, dob: ddmmyyyy }));
+      setState((p) => ({
+        ...p,
+        dobSaving: false,
+        dobMsg: null,
+        existingDob: ddmmyyyy,
+        dob: ddmmyyyy,
+      }));
     } catch (e: any) {
       setState((p) => ({ ...p, dobSaving: false, dobMsg: e?.message || "No se pudo guardar" }));
     }
@@ -485,13 +495,11 @@ function LoyaltyWidget() {
 
   return (
     <BlockStack spacing="loose">
-      {/* Solo CONSOLE: no pinta nada en pantalla */}
       {SHOW_DEBUG && <DebugCustomer />}
 
       {state.error ? (
         <>
           <Text>{state.error}</Text>
-
           {SHOW_DEBUG && (
             <>
               <Text>
@@ -499,9 +507,7 @@ function LoyaltyWidget() {
                 {String(state.debug.runtimeNumeric)} | queryGid: {String(state.debug.queryGid)} | usedGid:{" "}
                 {String(state.debug.usedGid)}
               </Text>
-              <Text>
-                INFO → email: {String(state.debug.email)} | name: {String(state.debug.name)}
-              </Text>
+              <Text>INFO → email: {String(state.debug.email)} | name: {String(state.debug.name)}</Text>
               <Text>NOTES → {state.debug.notes.join(" | ")}</Text>
               <Text>PAGE → preview: {String(state.debug.isPreview)} | {state.debug.href}</Text>
             </>
@@ -509,62 +515,105 @@ function LoyaltyWidget() {
         </>
       ) : (
         <>
-          <Text>Tu saldo de puntos: {state.balance ?? 0}</Text>
+          {/* ═══════════════════════════════════════════ */}
+          {/*           SECCIÓN DE PUNTOS MEJORADA        */}
+          {/* ═══════════════════════════════════════════ */}
+          <BlockStack spacing="loose">
+            {/* Saldo de puntos destacado */}
+            <BlockStack spacing="tight">
+              <Text emphasis="bold" size="large">Tu saldo de puntos: {state.balance ?? 0}</Text>
+              <Text appearance="subdued">Canjea tus puntos por descuentos exclusivos</Text>
+            </BlockStack>
 
-          <TextField
-            label="Puntos a canjear"
-            type="number"
-            value={state.points}
-            onChange={(value) => setState((prev) => ({ ...prev, points: value }))}
-          />
+            {/* Campo de canje con mejor diseño */}
+            <BlockStack spacing="tight">
+              <TextField
+                label="Puntos a canjear"
+                type="number"
+                value={state.points}
+                onChange={(value) => setState((prev) => ({ ...prev, points: value }))}
+              />
+              
+              <Button kind="primary" onPress={handleRedeem}>
+                Canjear
+              </Button>
+            </BlockStack>
 
-          <Button kind="primary" onPress={handleRedeem}>
-            Canjear
-          </Button>
+            {/* Mensajes de estado mejorados */}
+            {state.msg && (
+              <BlockStack spacing="tight">
+                <Text emphasis="bold">{state.msg}</Text>
+              </BlockStack>
+            )}
 
-          {/* Mensajes de usuario */}
-          {state.msg && !state.generatedCode && <Text>{state.msg}</Text>}
-          {state.msg && state.generatedCode && (
-            <>
-              <Text>
-                {state.msg} <Text emphasis="bold">{state.generatedCode}</Text>
-              </Text>
-            </>
-          )}
-
-          {/* ─────────────────────────────────────────── */}
-          {/*      NUEVO BLOQUE: Fecha de nacimiento      */}
-          {/* ─────────────────────────────────────────── */}
-          <Text emphasis="bold">¡Pon tu fecha de nacimiento y recibe 500 puntos como regalo de cumpleaños!</Text>
-
-          <BlockStack spacing="tight">
-            <TextField
-              label="Fecha de nacimiento (DD-MM-YYYY)"
-              value={state.dob}
-              onChange={(value) => setState((p) => ({ ...p, dob: value }))}
-              disabled={!!state.existingDob}
-              /* Nota: TextField de customer-account no soporta type="date"; usamos string y validamos formato */
-            />
-            <Button
-              kind="secondary"
-              onPress={handleSaveDob}
-              disabled={!!state.existingDob || state.dobSaving}
-            >
-              {state.existingDob ? "Guardada" : state.dobSaving ? "Guardando…" : "Guardar"}
-            </Button>
+            {/* Código generado con mejor presentación */}
+            {state.generatedCode && (
+              <BlockStack spacing="tight">
+                <Text emphasis="bold" size="large">🎉 ¡Código generado!</Text>
+                <BlockStack spacing="extraTight">
+                  <Text emphasis="bold" size="medium">{state.generatedCode}</Text>
+                  {state.amount != null && (
+                    <Text appearance="success">
+                      Vale por {String(state.amount)}€
+                      {state.expiresAt ? ` · Caduca: ${state.expiresAt}` : ""}
+                    </Text>
+                  )}
+                </BlockStack>
+                <Button kind="secondary" onPress={() => copyCodeToClipboard(state.generatedCode!)}>
+                  📋 Copiar código
+                </Button>
+              </BlockStack>
+            )}
           </BlockStack>
 
-          {state.existingDob && (
-            <Text>Ya tenemos tu fecha: {state.existingDob}. Si necesitas cambiarla, contacta con soporte.</Text>
-          )}
+          {/* ═══════════════════════════════════════════ */}
+          {/*      SECCIÓN DE CUMPLEAÑOS MEJORADA         */}
+          {/* ═══════════════════════════════════════════ */}
+          <BlockStack spacing="loose">
+            {/* Encabezado de cumpleaños atractivo */}
+            <BlockStack spacing="tight">
+              <Text emphasis="bold" size="large">🎂 ¡Celebra tu cumpleaños!</Text>
+              <Text>Pon tu fecha de nacimiento y recibe 15 puntos como regalo de cumpleaños</Text>
+            </BlockStack>
 
-          {state.dobMsg && <Text>{state.dobMsg}</Text>}
+            {/* Estado actual si ya tiene fecha */}
+            {state.existingDob && (
+              <BlockStack spacing="tight">
+                <Text emphasis="bold">Ya tenemos tu fecha: {state.existingDob}</Text>
+                <Text appearance="success">✅ ¡Recibirás 15 puntos en tu cumpleaños!</Text>
+              </BlockStack>
+            )}
 
-          {/* Bloque de depuración en pantalla → oculto por defecto */}
+            {/* Formulario de fecha de nacimiento */}
+            {!state.existingDob && (
+              <BlockStack spacing="tight">
+                <TextField
+                  label="Fecha de nacimiento (DD-MM-YYYY)"
+                  value={state.dob}
+                  onChange={(value) => setState((p) => ({ ...p, dob: value }))}
+                  disabled={!!state.existingDob}
+                />
+                
+                <Button 
+                  kind="secondary" 
+                  onPress={handleSaveDob} 
+                  disabled={!!state.existingDob || state.dobSaving}
+                >
+                  {state.existingDob ? "✅ Guardada" : state.dobSaving ? "Guardando…" : "🎁 Guardar"}
+                </Button>
+              </BlockStack>
+            )}
+
+            {/* Mensajes de estado para DOB */}
+            {state.dobMsg && (
+              <Text appearance="critical">{state.dobMsg}</Text>
+            )}
+          </BlockStack>
+
           {SHOW_DEBUG && (
             <Text>
-              DEBUG → runtimeGid: {String(state.debug.runtimeGid)} | usedGid:{" "}
-              {String(state.debug.usedGid)} | email: {String(state.debug.email)}
+              DEBUG → runtimeGid: {String(state.debug.runtimeGid)} | usedGid: {String(state.debug.usedGid)} | email:{" "}
+              {String(state.debug.email)}
             </Text>
           )}
         </>
