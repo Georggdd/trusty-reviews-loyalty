@@ -559,7 +559,6 @@ function LoyaltyWidget() {
                   <Button 
                     kind="secondary" 
                     onPress={handleRedeem}
-                    appearance="monochrome"
                   >
                     ✨ Canjear
                   </Button>
@@ -610,7 +609,6 @@ function LoyaltyWidget() {
                     <Button 
                       kind="secondary" 
                       onPress={() => copyCodeToClipboard(state.generatedCode!)}
-                      appearance="monochrome"
                     >
                       📋 Copiar Código
                     </Button>
@@ -692,22 +690,11 @@ function LoyaltyWidget() {
                       kind="secondary" 
                       onPress={handleSaveDob} 
                       disabled={state.dobSaving}
-                      appearance="monochrome"
                     >
                       {state.dobSaving ? "⏳ Guardando..." : "🎁 Guardar"}
                     </Button>
                   </InlineStack>
 
-                  {/* Mensaje motivacional */}
-                  <View 
-                    border="base" 
-                    cornerRadius="base" 
-                    padding="tight"
-                  >
-                    <Text size="small" appearance="subdued">
-                      💡 Ejemplo: 02-10-2000
-                    </Text>
-                  </View>
                 </BlockStack>
               )}
 
