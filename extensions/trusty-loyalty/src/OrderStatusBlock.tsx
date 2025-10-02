@@ -400,7 +400,7 @@ function LoyaltyWidget() {
       const ok = redRes.ok && ((rj?.ok === true) || (rj?.success === true));
       if (!ok) {
         const err = (rj?.error || "").toString();
-        if (err === "no_redemption_option") { setState((p) => ({ ...p, msg: rj.message || `No hay opción de canje para ${points} puntos.` })); return; }
+        if (err === "no_redemption_option") { setState((p) => ({ ...p, msg: rj.message || `Solo puedes canjear 100 o 200 puntos. Ajusta la cantidad e inténtalo de nuevo.` })); return; }
         if (err === "Insufficient points" || err === "INSUFFICIENT_BALANCE") { setState((p) => ({ ...p, msg: `Saldo insuficiente. Tienes ${rj.available} puntos, necesitas ${rj.required}.` })); return; }
         if (err === "invalid_token") { setState((p) => ({ ...p, msg: `Token inválido. Cierra sesión y vuelve a entrar.` })); return; }
         throw new Error(err || `No se pudo canjear (HTTP ${redRes.status}).`);
@@ -556,13 +556,16 @@ function LoyaltyWidget() {
                       onChange={(value) => setState((prev) => ({ ...prev, points: value }))}
                     />
                   </BlockStack>
-                  <Button 
-                    kind="secondary" 
-                    onPress={handleRedeem}
-                    appearance="monochrome"
-                  >
-                    ✨ Canjear
-                  </Button>
+                  <Pressable onPress={handleRedeem}>
+                    <View 
+                      border="base" 
+                      cornerRadius="base" 
+                      padding="tight"
+                      background="subdued"
+                    >
+                      <Text emphasis="bold">✨ Canjear</Text>
+                    </View>
+                  </Pressable>
                 </InlineStack>
               </BlockStack>
 
@@ -607,13 +610,16 @@ function LoyaltyWidget() {
                       </Text>
                     )}
                     
-                    <Button 
-                      kind="secondary" 
-                      onPress={() => copyCodeToClipboard(state.generatedCode!)}
-                      appearance="monochrome"
-                    >
-                      📋 Copiar Código
-                    </Button>
+                    <Pressable onPress={() => copyCodeToClipboard(state.generatedCode!)}>
+                      <View 
+                        border="base" 
+                        cornerRadius="base" 
+                        padding="tight"
+                        background="subdued"
+                      >
+                        <Text emphasis="bold">📋 Copiar Código</Text>
+                      </View>
+                    </Pressable>
                   </BlockStack>
                 </View>
               )}
@@ -667,12 +673,14 @@ function LoyaltyWidget() {
                   </View>
                   
                   {/* Botón deshabilitado con estilo grisáceo */}
-                  <Button 
-                    kind="secondary" 
-                    disabled={true}
+                  <View 
+                    border="base" 
+                    cornerRadius="base" 
+                    padding="tight"
+                    background="subdued"
                   >
-                    ✅ Fecha Guardada
-                  </Button>
+                    <Text emphasis="bold" appearance="subdued">✅ Fecha Guardada</Text>
+                  </View>
                 </BlockStack>
               ) : (
                 /* Formulario activo con diseño moderno */
@@ -688,14 +696,21 @@ function LoyaltyWidget() {
                         disabled={state.dobSaving}
                       />
                     </BlockStack>
-                    <Button 
-                      kind="secondary" 
-                      onPress={handleSaveDob} 
+                    <Pressable 
+                      onPress={handleSaveDob}
                       disabled={state.dobSaving}
-                      appearance="monochrome"
                     >
-                      {state.dobSaving ? "⏳ Guardando..." : "🎁 Guardar"}
-                    </Button>
+                      <View 
+                        border="base" 
+                        cornerRadius="base" 
+                        padding="tight"
+                        background="subdued"
+                      >
+                        <Text emphasis="bold" appearance={state.dobSaving ? "subdued" : undefined}>
+                          {state.dobSaving ? "⏳ Guardando..." : "🎁 Guardar"}
+                        </Text>
+                      </View>
+                    </Pressable>
                   </InlineStack>
 
                 </BlockStack>
