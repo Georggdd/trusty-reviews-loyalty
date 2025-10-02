@@ -1,12 +1,12 @@
 import * as React from "react";
 import { Text, BlockStack, TextField, Button } from "@shopify/ui-extensions-react/checkout";
 
-// ====== CONFIG RÁPIDA (ajusta solo estas constantes) ======
+// ====== CONFIG ======
 const EDGE_SIGN_LOYALTY_LINK = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/sign_loyalty_link";
-const EDGE_LOYALTY_BALANCE   = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/loyalty_balance";
-const EDGE_REDEEM_POINTS     = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/redeem_points";
+const EDGE_LOYALTY_BALANCE   = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/loyalty_balance"; // OK para saldo con token
+const EDGE_REDEEM_DISCOUNT   = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/redeem_discount_code"; // ⬅️ NUEVO
 const SHOP_DOMAIN            = "sandboxdivain.myshopify.com";
-// ==========================================================
+// =====================
 
 function formUrlEncoded(obj: Record<string, string | number | undefined | null>): string {
   const usp = new URLSearchParams();
@@ -27,6 +27,8 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
     points: "",
     msg: null as string | null,
     generatedCode: null as string | null,
+    amount: null as number | null,
+    expiresAt: null as string | null,
   });
 
   async function getTokenByEmail(mail: string): Promise<string> {
@@ -56,7 +58,6 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
     (async () => {
       try {
         if (!email) {
-          // Checkout todavía no nos dio el email → mantenemos loading
           setState((s) => ({ ...s, loading: true, error: null }));
           return;
         }
@@ -73,21 +74,21 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
 
   async function handleRedeem() {
     try {
-      setState((p) => ({ ...p, msg: null, generatedCode: null }));
+      setState((p) => ({ ...p, msg: null, generatedCode: null, amount: null, expiresAt: null }));
 
       const points = parseInt(state.points, 10);
-      if (!email) return; // en checkout debería estar siempre
+      if (!email) return;
       if (!Number.isInteger(points) || points <= 0) {
         setState((p) => ({ ...p, msg: "Introduce un número de puntos válido." }));
         return;
       }
 
-      // 1) Obtener token por email
+      // 1) Token por email
       const token = await getTokenByEmail(email);
 
-      // 2) Preflight lógico
+      // 2) Preflight con el endpoint nuevo (opcional pero útil para mensajes)
       {
-        const preUrl = new URL(EDGE_REDEEM_POINTS);
+        const preUrl = new URL(EDGE_REDEEM_DISCOUNT);
         preUrl.searchParams.set("preflight", "true");
         preUrl.searchParams.set("shop", SHOP_DOMAIN);
         const preRes = await fetch(preUrl.toString(), {
@@ -96,22 +97,23 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
           body: formUrlEncoded({ token, points }),
         });
         const pj = await preRes.json().catch(() => ({}));
-        if (!preRes.ok || !pj?.ok) {
-          const err = pj?.error || "Error preflight";
-          if (err === "min_redeem_not_met") {
-            setState((p) => ({ ...p, msg: `Debes canjear al menos ${pj.min_redeem} puntos.` }));
+        const ok = preRes.ok && (pj?.ok === true || pj?.success === true || pj?.preflight === true);
+        if (!ok) {
+          const err = (pj?.error || "").toString();
+          if (err === "no_redemption_option") {
+            setState((p) => ({ ...p, msg: pj?.message || `No hay opción de canje para ${points} puntos.` }));
             return;
           }
-          if (err === "insufficient_balance") {
-            setState((p) => ({ ...p, msg: `Saldo insuficiente. Tienes ${pj.currentBalance} puntos.` }));
+          if (err === "Insufficient points" || err === "insufficient_balance") {
+            setState((p) => ({ ...p, msg: `Saldo insuficiente. Tienes ${pj?.available ?? pj?.currentBalance ?? "0"} puntos.` }));
             return;
           }
-          throw new Error(err);
+          throw new Error(err || "Error preflight");
         }
       }
 
-      // 3) Canje real
-      const redUrl = new URL(EDGE_REDEEM_POINTS);
+      // 3) Canje real con el endpoint nuevo
+      const redUrl = new URL(EDGE_REDEEM_DISCOUNT);
       redUrl.searchParams.set("shop", SHOP_DOMAIN);
       const redRes = await fetch(redUrl.toString(), {
         method: "POST",
@@ -119,10 +121,42 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
         body: formUrlEncoded({ token, points }),
       });
       const rj = await redRes.json().catch(() => ({}));
-      if (!redRes.ok || !rj?.ok) throw new Error(rj?.error || "No se pudo canjear.");
 
-      // 4) Mensaje + refrescar saldo
-      setState((p) => ({ ...p, msg: "Código generado:", generatedCode: rj.discount_code, points: "" }));
+      const ok = redRes.ok && ((rj?.ok === true) || (rj?.success === true));
+      if (!ok) {
+        const err = (rj?.error || "").toString();
+        if (err === "no_redemption_option") {
+          setState((p) => ({ ...p, msg: rj.message || `No hay opción de canje para ${points} puntos.` }));
+          return;
+        }
+        if (err === "Insufficient points" || err === "INSUFFICIENT_BALANCE") {
+          setState((p) => ({ ...p, msg: `Saldo insuficiente. Tienes ${rj.available} puntos, necesitas ${rj.required}.` }));
+          return;
+        }
+        if (err === "invalid_token") {
+          setState((p) => ({ ...p, msg: `Token inválido. Vuelve a introducir el email o recarga la página.` }));
+          return;
+        }
+        throw new Error(err || `No se pudo canjear (HTTP ${redRes.status}).`);
+      }
+
+      // 4) Extrae datos (tolerante a claves antiguas/nuevas)
+      const code     = rj.discount_code ?? rj.code ?? null;
+      const amount   = typeof rj.amount === "number"
+                        ? rj.amount
+                        : (typeof rj.discount_amount === "number" ? rj.discount_amount : null);
+      const expires  = rj.expires_at ?? rj.expiry ?? null;
+
+      setState((p) => ({
+        ...p,
+        msg: "Código generado:",
+        generatedCode: code,
+        amount,
+        expiresAt: expires,
+        points: "",
+      }));
+
+      // 5) Refrescar saldo
       const newBalance = await fetchBalanceByEmail(email);
       setState((p) => ({ ...p, balance: newBalance }));
     } catch (e: any) {
@@ -131,14 +165,14 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
   }
 
   if (state.loading) return <Text>Cargando tus puntos…</Text>;
-  if (state.error) return <Text>{state.error}</Text>;
+  if (state.error)   return <Text>{state.error}</Text>;
 
   return (
     <BlockStack spacing="loose">
       <Text>Tu saldo de puntos: {state.balance ?? 0}</Text>
 
       <TextField
-        label="Puntos a canjear"
+        label="Puntos a canjear (100 → 5€, 200 → 10€)"
         type="number"
         value={state.points}
         onChange={(value) => setState((p) => ({ ...p, points: value }))}
@@ -149,10 +183,16 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
       </Button>
 
       {state.msg && !state.generatedCode && <Text>{state.msg}</Text>}
+
       {state.msg && state.generatedCode && (
-        <Text>
-          {state.msg} <Text emphasis="bold">{state.generatedCode}</Text>
-        </Text>
+        <BlockStack spacing="tight">
+          <Text>
+            {state.msg} <Text emphasis="bold">{state.generatedCode}</Text>
+          </Text>
+          {state.amount != null && (
+            <Text>Importe: {String(state.amount)}€{state.expiresAt ? ` · Caduca: ${state.expiresAt}` : ""}</Text>
+          )}
+        </BlockStack>
       )}
     </BlockStack>
   );

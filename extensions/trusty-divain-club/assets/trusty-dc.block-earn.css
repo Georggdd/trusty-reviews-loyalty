@@ -1,0 +1,91 @@
+.trusty-dc-earn-yotpo{
+    max-width: 1280px;
+    margin: 72px auto 24px;
+    padding: 0 24px;
+    text-align: center;
+  }
+  .trusty-dc-earn-yotpo h2{ font-size: 30px; font-weight: 700; margin: 0 0 22px; }
+  
+  /* 6 columnas invisibles → 3 tarjetas por fila (cada tarjeta = 2 columnas) */
+  .trusty-dc-earn-yotpo-grid{
+    display:grid;
+    grid-template-columns: repeat(6, minmax(0,1fr));
+    gap:18px;
+    justify-content:center;
+  }
+  
+  /* Todas las tarjetas igual tamaño */
+  .tdey-card{
+    grid-column: span 2;
+    height: 240px;
+    padding: 32px 28px;
+    background:#fff;
+    border:1px solid var(--c-border);
+    border-radius:16px;
+    display:grid;
+    grid-template-rows:auto auto 1fr;
+    justify-items:center;
+    align-items:start;
+    text-align:center;
+    position:relative;
+    outline:none;
+  }
+  .tdey-card:focus-visible{
+    box-shadow:0 0 0 2px rgba(30,102,175,.95), 0 0 16px 4px rgba(59,130,246,.55);
+  }
+  
+  .trusty-dc-icon{ line-height:0; color:#000; margin-bottom:12px; }
+  .trusty-dc-icon svg{ width:60px; height:60px; }
+  
+  .tdey-title{ font-size:22px; font-weight:700; margin-bottom: 10px; color:#000; }
+  .tdey-desc{ font-size:16.5px; color:var(--c-muted); max-width:460px; }
+  
+  /* Botón de redes visible (cuando hay href) */
+  .tdey-social{
+    display:inline-block;
+    margin-top:8px;
+    padding:8px 14px;
+    border:1px solid #000;
+    border-radius:999px;
+    text-decoration:none;
+    color:#000;
+  }
+  .tdey-social:hover{ background:#000; color:#fff; }
+  
+  /* Overlay CTA hover (registro/login) */
+  .tdey-overlay{
+    position:absolute; inset:0;
+    display:grid; place-content:center; gap:10px;
+    background:#fff;
+    border-radius:16px;
+    opacity:0; visibility:hidden;
+    transition: opacity .2s ease, visibility .2s ease;
+    padding:20px;
+  }
+  .tdey-card:hover .tdey-overlay,
+  .tdey-card:focus-within .tdey-overlay{ opacity:1; visibility:visible; }
+  
+  .tdey-cta{
+    font-size:17px;
+    padding:12px 22px;
+    background:#000 !important;
+    color:#fff !important;
+    border:1px solid #000 !important;
+    border-radius:999px;
+  }
+  .tdey-cta:hover,
+  .tdey-cta:focus-visible{
+    box-shadow:0 0 0 2px rgba(30,102,175,.95), 0 0 16px 4px rgba(59,130,246,.55);
+  }
+  
+  .tdey-login{ font-size:15px; color: var(--c-text); }
+  .tdey-login a{ color:#00a8a8; text-decoration:none; }
+  .tdey-login a:hover{ text-decoration:underline; }
+  
+  @media (max-width: 1024px){ .trusty-dc-earn-yotpo-grid{ gap:22px; } }
+  @media (max-width: 760px){
+    .trusty-dc-earn-yotpo{ margin-top: 44px; padding: 0 12px; }
+    .trusty-dc-earn-yotpo-grid{ grid-template-columns: 1fr; gap:14px; }
+    .tdey-card{ grid-column:auto; height:200px; }
+  }
+  

@@ -1,0 +1,6 @@
+.trusty-dc-tiers-wrap { margin-top: 24px; text-align:center; }
+.trusty-dc-tiers { display:grid; grid-template-columns: repeat(3, 1fr); gap:16px; }
+.trusty-dc-tier .trusty-dc-tier-name { font-weight: 700; margin-bottom: 6px; }
+.trusty-dc-tier .trusty-dc-tier-threshold { color: var(--c-muted); font-size: 13px; margin-bottom: 10px; }
+.trusty-dc-tier .trusty-dc-tier-perks { list-style: none; padding: 0; margin: 0; color: var(--c-muted); font-size: 13px; }
+.trusty-dc-tier .trusty-dc-tier-perks li { margin: 3px 0; }

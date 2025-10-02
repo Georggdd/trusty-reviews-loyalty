@@ -1,31 +1,67 @@
 {% comment %}
-Bloque principal del widget Divain Club (Theme App Extension).
-- Renderiza un contenedor vacío.
-- Pasa shop y settings al JS vía data-attributes.
+Trusty Divain Club — Theme App Extension (App Block)
+Modular: CSS/JS base + 5 bloques. El código "extras" se integró en el bloque HOW.
 {% endcomment %}
 
-<div id="trusty-divain-club"
-     data-shop="{{ shop.permanent_domain | escape }}"
-     data-title-override="{{ block.settings.title_override | escape }}"
-     data-show-how="{{ block.settings.show_how }}"
-     data-show-earn="{{ block.settings.show_earn }}"
-     data-show-redeem="{{ block.settings.show_redeem }}">
+<div
+  id="trusty-divain-club"
+  data-shop="{{ shop.permanent_domain | escape }}"
+  data-customer-id="{{ customer.id | default: '' }}"
+  data-title-override="{{ block.settings.title_override | escape }}"
+  data-subtitle-override="{{ block.settings.subtitle_override | escape }}"
+  data-show-how="{{ block.settings.show_how }}"
+  data-show-earn="{{ block.settings.show_earn }}"
+  data-show-redeem="{{ block.settings.show_redeem }}"
+  data-show-tiers="{{ block.settings.show_tiers }}"
+  data-cta1-label="{{ block.settings.hero_cta_primary_label | escape }}"
+  data-cta1-link="{{ block.settings.hero_cta_primary_link | escape }}"
+  data-cta2-label="{{ block.settings.hero_cta_secondary_label | escape }}"
+  data-cta2-link="{{ block.settings.hero_cta_secondary_link | escape }}"
+  data-fb-url="https://www.facebook.com/divainpparfums/"
+  data-ig-url="https://www.instagram.com/divain_parfums/"
+  data-tk-url="https://tiktok.com/@divain_parfums?lang=es"
+>
   <div class="trusty-dc-loading">Cargando Divain Club…</div>
   <noscript>Activa JavaScript para ver el contenido.</noscript>
 </div>
 
-<link href="{{ 'trusty-divain-club.css' | asset_url }}" rel="stylesheet">
-<script src="{{ 'trusty-divain-club.js' | asset_url }}" defer></script>
+{%- comment -%} CSS core + CSS de bloques {%- endcomment -%}
+<link href="{{ 'trusty-dc-core.css' | asset_url }}" rel="stylesheet">
+<link href="{{ 'trusty-dc.block-hero.css' | asset_url }}" rel="stylesheet">
+<link href="{{ 'trusty-dc.block-how.css' | asset_url }}" rel="stylesheet">
+<link href="{{ 'trusty-dc.block-earn.css' | asset_url }}" rel="stylesheet">
+<link href="{{ 'trusty-dc.block-redeem.css' | asset_url }}" rel="stylesheet">
+<link href="{{ 'trusty-dc.block-tiers.css' | asset_url }}" rel="stylesheet">
+
+{%- comment -%}
+JS: El CORE debe cargarse antes que los bloques.
+Con defer, el navegador respeta el orden de aparición.
+{%- endcomment -%}
+<script src="{{ 'trusty-dc-core.js' | asset_url }}" defer crossorigin="anonymous"></script>
+
+<script src="{{ 'trusty-dc.block-hero.js' | asset_url }}" defer crossorigin="anonymous"></script>
+<script src="{{ 'trusty-dc.block-how.js' | asset_url }}" defer crossorigin="anonymous"></script>
+<script src="{{ 'trusty-dc.block-earn.js' | asset_url }}" defer crossorigin="anonymous"></script>
+<script src="{{ 'trusty-dc.block-redeem.js' | asset_url }}" defer crossorigin="anonymous"></script>
+<script src="{{ 'trusty-dc.block-tiers.js' | asset_url }}" defer crossorigin="anonymous"></script>
 
 {% schema %}
 {
   "name": "Trusty Divain Club",
   "target": "section",
   "settings": [
-    { "type": "text", "id": "title_override", "label": "Título (opcional)", "default": "DIVAIN Club" },
+    { "type": "text", "id": "title_override", "label": "Título (opcional)", "default": "__KEEP_DB__" },
+    { "type": "text", "id": "subtitle_override", "label": "Subtítulo (opcional)", "default": "__KEEP_DB__" },
+
     { "type": "checkbox", "id": "show_how", "label": "Mostrar 'Cómo funciona'", "default": true },
     { "type": "checkbox", "id": "show_earn", "label": "Mostrar 'Formas de ganar'", "default": true },
-    { "type": "checkbox", "id": "show_redeem", "label": "Mostrar 'Formas de canjear'", "default": true }
+    { "type": "checkbox", "id": "show_redeem", "label": "Mostrar 'Formas de canjear'", "default": true },
+    { "type": "checkbox", "id": "show_tiers", "label": "Mostrar 'Tiers'", "default": true },
+
+    { "type": "text", "id": "hero_cta_primary_label", "label": "CTA principal (texto)", "default": "ÚNETE AL CLUB" },
+    { "type": "text", "id": "hero_cta_primary_link",  "label": "CTA principal (enlace: /account/register o https://...)", "default": "/account/register" },
+    { "type": "text", "id": "hero_cta_secondary_label", "label": "CTA secundaria (texto)", "default": "INICIAR SESIÓN" },
+    { "type": "text", "id": "hero_cta_secondary_link",  "label": "CTA secundaria (enlace: /account/login o https://...)", "default": "/account/login" }
   ]
 }
 {% endschema %}

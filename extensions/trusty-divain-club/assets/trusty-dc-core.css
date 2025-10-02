@@ -1,0 +1,176 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+
+#trusty-divain-club {
+  --c-text: #111;
+  --c-muted: #6b7280;
+  --c-border: #e5e7eb;
+  --c-bg: #f6f7f9;
+  --c-card: #fff;
+  --c-accent: #111;
+  --radius-xl: 20px;
+  --radius-lg: 16px;
+  --radius-md: 12px;
+  --shadow-sm: 0 1px 2px rgba(0,0,0,.05);
+  --shadow-md: 0 12px 30px rgba(0,0,0,.08);
+  color: var(--c-text);
+  font-family: inherit;
+  line-height: 1.45;
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+#trusty-divain-club * { box-sizing: border-box; }
+
+#trusty-divain-club section {
+  max-width: 1920px;
+  margin: 40px auto;
+  padding: 0 24px;
+}
+
+.trusty-dc-btn{
+  display:inline-block;
+  border-radius:999px;
+  padding:14px 28px;
+  font-size:20px;
+  line-height:1;
+  text-decoration:none;
+  border:1px solid transparent;
+  white-space:nowrap;
+  user-select:none;
+  transition: background-color .35s ease, color .35s ease, border-color .35s ease, box-shadow .35s ease, transform .05s ease;
+}
+.trusty-dc-btn--primary{ background:var(--c-accent); color:#fff; border-color:var(--c-accent); }
+.trusty-dc-btn--primary:hover{ background:#fff; color:#000; border-color:#000; }
+.trusty-dc-btn--ghost{ background:#fff; color:#000; border-color:#000; }
+.trusty-dc-btn--ghost:hover{ background:#bdbdbd; color:#000; border-color:#000; }
+.trusty-dc-btn:focus-visible{
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(30,102,175,0.95), 0 0 16px 4px rgba(59,130,246,.55);
+}
+
+/* Grid y tarjetas genéricas */
+.trusty-dc-grid { list-style: none; padding: 0; margin: 0; display: grid; gap: 10px; grid-template-columns: repeat(3, 1fr); }
+.trusty-dc-card {
+  background: var(--c-card);
+  border: 1px solid var(--c-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  min-height: 110px;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 18px 20px;
+}
+/* Fuerza turquesa a cualquier SVG de las 6 tarjetas del grid */
+.trusty-dc-earn-yotpo-grid .tdey-card svg { color:#05B4BD; stroke: currentColor; }
+
+@media (max-width: 640px){
+  #trusty-divain-club section { margin: 28px auto; padding: 0 12px; }
+}
+
+/* Overlay CTA unificado para invitado (se mantiene tal cual) */
+.trusty-dc-earn-yotpo-grid .tdey-card .trusty-dc-btn--primary,
+.trusty-dc-earn-yotpo-grid .tdey-card .tdey-bday-join{
+  background:#000;
+  border-color:#000;
+  color:#fff;
+  border-radius:999px;
+  padding:16px 34px;
+  font-size:20px;
+  line-height:1;
+  transition: box-shadow .2s ease, transform .05s ease;
+}
+.trusty-dc-earn-yotpo-grid .tdey-card:hover .trusty-dc-btn--primary,
+.trusty-dc-earn-yotpo-grid .tdey-card:focus-within .tdey-card .trusty-dc-btn--primary,
+.trusty-dc-earn-yotpo-grid .tdey-card:hover .tdey-bday-join,
+.trusty-dc-earn-yotpo-grid .tdey-card:focus-within .tdey-bday-join{
+  box-shadow:
+    0 0 0 4px rgba(5,180,189,.25),
+    0 0 24px 8px rgba(5,180,189,.35);
+  transform: translateY(-1px);
+}
+.trusty-dc-earn-yotpo-grid .tdey-card .trusty-dc-btn--primary:hover,
+.trusty-dc-earn-yotpo-grid .tdey-card .tdey-bday-join:hover{
+  background:#000;
+  color:#fff;
+  border-color:#000;
+}
+.trusty-dc-earn-yotpo-grid .tdey-bday-auth,
+.trusty-dc-earn-yotpo-grid .dc-hover-auth{
+  font-size:14px;
+}
+
+/* =========================================================
+   ★★★ CAJA 3 – Earn (“1 € = 1 divipoint”) – sólo HTML/CSS (sin imágenes)
+   ========================================================= */
+.tdey-earn3 { position: relative; overflow: hidden; border-radius: inherit; }
+
+/* Estado LOGADO: cuerpo de la tarjeta */
+.tdey-earn3--logged .tdey-earn3-body{
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center;
+  padding: 18px 20px;
+  transition: opacity .18s ease;
+}
+
+.tdey-earn3-icon{ display:flex; align-items:center; justify-content:center; margin-bottom:8px; }
+.tdey-earn3-icon svg{ width:56px; height:56px; color:#05B4BD; stroke: currentColor; }
+.tdey-earn3-title{ font-weight: 700; font-size: 22px; line-height: 1.15; margin: 4px 0 2px; }
+.tdey-earn3-sub{ color: var(--c-muted); font-size: 15px; }
+
+/* Overlay de TEXTO en hover (sólo logado) */
+.tdey-earn3-hover{
+  position:absolute; inset:0;
+  display:flex; align-items:center; justify-content:center;
+  text-align:center; padding:0 24px;
+  background: rgba(255,255,255,0.88);
+  opacity:0; pointer-events:none; transition: opacity .22s ease;
+  z-index: 2;
+}
+/* al pasar el cursor, el cuerpo desaparece por completo */
+.tdey-earn3--logged:hover .tdey-earn3-body,
+.tdey-earn3--logged:focus-within .tdey-earn3-body{
+  opacity: 0;
+}
+.tdey-earn3-msg{ font-weight:700; font-size:20px; line-height:1.35; color:#0b0f1a; }
+
+/* 🔒 Si está LOGGED, oculta cualquier overlay/CTA de invitado que otros scripts pinten */
+.tdey-earn3--logged .tdey-bday-hover,
+.tdey-earn3--logged .tdey-bday-join,
+.tdey-earn3--logged .trusty-dc-btn--primary,
+.tdey-earn3--logged .dc-hover,
+.tdey-earn3--logged .dc-hover-auth{
+  display: none !important;
+}
+
+/* =========================================================
+   ★★★ CAJAS 4–6 (Social) – estilo de enlace y overlay “Completado”
+   ========================================================= */
+
+/* Link de redes (solo la palabra Facebook/Instagram/TikTok) */
+.tdey-social-link{
+  color: #1d4ed8;           /* azul */
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  font-weight: 500;
+}
+.tdey-social-link:hover{
+  text-decoration-thickness: 2px;
+}
+
+/* Contenedor con overlay de completado */
+.tdey-social{ position: relative; overflow: hidden; border-radius: inherit; }
+
+/* Capa “¡Completado!” (invisible por defecto) */
+.tdey-social-done{
+  position: absolute; inset: 0; border-radius: inherit;
+  display: flex; align-items: center; justify-content: center;
+  background: #fff; /* opaco para cubrir el contenido base */
+  color: #0b8e8a; font-weight: 700; font-size: 20px;
+  opacity: 0; pointer-events: none; transition: opacity .22s ease;
+  z-index: 2;
+}
+
+/* Mostrar el overlay al pasar el cursor solo cuando la tarjeta está en estado done */
+.tdey-social--done:hover .tdey-social-done,
+.tdey-social--done:focus-within .tdey-social-done{
+  opacity: 1;
+}
+
