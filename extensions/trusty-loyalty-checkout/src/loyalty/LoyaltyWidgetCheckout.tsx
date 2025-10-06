@@ -8,6 +8,23 @@ const EDGE_REDEEM_DISCOUNT   = "https://tizzlfjuosqfyefybdee.supabase.co/functio
 const SHOP_DOMAIN            = "sandboxdivain.myshopify.com";
 // =====================
 
+
+// 👉 helper para formatear fechas a DD/MM/AAAA
+const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+function formatDateDDMMYYYY(iso?: string | null): string {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (!Number.isNaN(+d)) {
+      return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
+    }
+  } catch {}
+  // Fallback si viene "YYYY-MM-DD"
+  const [y, m, d] = String(iso).split("T")[0].split("-");
+  if (y && m && d) return `${pad2(Number(d))}/${pad2(Number(m))}/${y}`;
+  return String(iso);
+}
+
 function formUrlEncoded(obj: Record<string, string | number | undefined | null>): string {
   const usp = new URLSearchParams();
   for (const k in obj) {
@@ -190,8 +207,8 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
             {state.msg} <Text emphasis="bold">{state.generatedCode}</Text>
           </Text>
           {state.amount != null && (
-            <Text>Importe: {String(state.amount)}€{state.expiresAt ? ` · Caduca: ${state.expiresAt}` : ""}</Text>
-          )}
+             <Text>Caduca el: {formatDateDDMMYYYY(state.expiresAt)}.</Text>
+            )}
         </BlockStack>
       )}
     </BlockStack>
