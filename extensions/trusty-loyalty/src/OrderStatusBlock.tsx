@@ -426,38 +426,13 @@ function LoyaltyWidget() {
       const amount = (typeof rj.amount === "number" ? rj.amount : typeof rj.discount_amount === "number" ? rj.discount_amount : null);
       const expiresAt = rj.expires_at ?? rj.expiry ?? null;
   
-      setState((prev) => ({ ...prev, msg: "Código de descuento generado:", generatedCode: code, amount, expiresAt, points: "" }));
+      setState((prev) => ({ ...prev, msg: null, generatedCode: code, amount, expiresAt, points: "" }));
   
       await fetchBalance(usedGidLocal);
     } catch (e: any) {
       setState((prev) => ({ ...prev, msg: e?.message || "Error en el canje." }));
     }
   }  
-
-  async function copyCodeToClipboard(code: string) {
-    try {
-      // 1) API moderna
-      if ((navigator as any)?.clipboard?.writeText) {
-        await (navigator as any).clipboard.writeText(code);
-      } else {
-        // 2) Fallback execCommand
-        const ta = document.createElement("textarea");
-        ta.value = code;
-        ta.setAttribute("readonly", "");
-        ta.style.position = "fixed";
-        ta.style.top = "-9999px";
-        document.body.appendChild(ta);
-        ta.select();
-        const ok = document.execCommand("copy");
-        document.body.removeChild(ta);
-        if (!ok) throw new Error("execCommand falló");
-      }
-      setState((p) => ({ ...p, msg: "Código copiado al portapapeles ✅" }));
-    } catch {
-      setState((p) => ({ ...p, msg: "No se pudo copiar. Copia manualmente." }));
-    }
-  }
-
   // ────────────────────────────────────────────────────────────────
   //          UI DE FECHA DE NACIMIENTO (Option B + Klaviyo)
   // ────────────────────────────────────────────────────────────────
@@ -594,7 +569,7 @@ function LoyaltyWidget() {
                     onPress={handleRedeem}
                     accessibilityLabel="Canjear puntos"
                   >
-                    ✨ Canjear
+                     Canjear
                   </Button>
                 </InlineStack>
               </BlockStack>
@@ -610,32 +585,23 @@ function LoyaltyWidget() {
                 </View>
               )}
 
-              {/* Código generado (alineado a la izquierda, sin caja envolvente) */}
-              {state.generatedCode && (
-                <BlockStack spacing="tight" inlineAlignment="start">
-                  <Text size="large" emphasis="bold">🎉 ¡Código Generado!</Text>
-                  
-                  <View border="base" cornerRadius="base" padding="tight">
-                    <Text emphasis="bold" size="medium">
-                      {state.generatedCode}
-                    </Text>
-                  </View>
-                  
-                  {state.amount != null && (
-                    <Text appearance="success" size="medium">
-                      Vale por {String(state.amount)}€ • Caduca: {formatDateDDMMYYYY(state.expiresAt)}
-                    </Text>
-                  )}
+{state.generatedCode && (
+  <BlockStack spacing="tight" inlineAlignment="start">
+    <InlineStack spacing="base" blockAlignment="center">
+      <Text emphasis="bold" size="large">Código generado:</Text>
+      <View border="base" cornerRadius="base" padding="tight">
+        <Text emphasis="bold" size="medium">{state.generatedCode}</Text>
+      </View>
+    </InlineStack>
 
-                  <Button
-                    kind="secondary"
-                    onPress={() => copyCodeToClipboard(state.generatedCode!)}
-                    accessibilityLabel="Copiar código de descuento"
-                  >
-                    📋 Copiar Código
-                  </Button>
-                </BlockStack>
-              )}
+    {state.amount != null && (
+      <Text appearance="success" size="medium">
+        Vale por {String(state.amount)}€ • Caduca el: {formatDateDDMMYYYY(state.expiresAt)}
+      </Text>
+    )}
+  </BlockStack>
+)}
+
             </BlockStack>
           </View>
 
@@ -665,14 +631,17 @@ function LoyaltyWidget() {
 
               {/* Estado cuando ya tiene fecha guardada (izquierda, sin caja envolvente) */}
               {state.existingDob ? (
-                <BlockStack spacing="tight" inlineAlignment="start">
-                  <Text emphasis="bold" size="extraLarge">Fecha guardada</Text>
-                  <Text size="medium">{state.existingDob}</Text>
-                  <Text appearance="success" size="small">
-                    🎁 ¡Recibirás puntos en tu cumpleaños!
-                  </Text>
-                </BlockStack>
-              ) : (
+  <BlockStack spacing="tight" inlineAlignment="start">
+    <InlineStack spacing="base" blockAlignment="center">
+      <Text emphasis="bold" size="large">Fecha guardada:</Text>
+      <Text size="medium">{state.existingDob}</Text>
+    </InlineStack>
+    <Text appearance="success" size="medium">
+      ¡Recibirás puntos en tu cumpleaños!
+    </Text>
+  </BlockStack>
+) : (
+
                 /* Formulario activo */
                 <BlockStack spacing="base">
                   <Text emphasis="bold">📅 Tu Fecha de Nacimiento</Text>
@@ -693,7 +662,7 @@ function LoyaltyWidget() {
                       loading={state.dobSaving}
                       accessibilityLabel="Guardar fecha de nacimiento"
                     >
-                      🎁 {state.dobSaving ? "Guardando…" : "Guardar"}
+                       {state.dobSaving ? "Guardando…" : "Guardar"}
                     </Button>
                   </InlineStack>
                 </BlockStack>
