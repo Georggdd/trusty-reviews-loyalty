@@ -14,6 +14,16 @@ redirect_urls = [
   "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/auth_callback"
 ]
 
+# ⬇️ Scopes restaurados (una sola línea, sin espacios)
+[access_scopes]
+scopes = "read_customers,read_price_rules,write_price_rules,read_discounts,write_discounts,write_draft_orders,read_draft_orders,read_orders"
+
+# ⬇️ App Proxy restaurado
+[app_proxy]
+prefix = "apps"
+subpath = "trusty-loyalty"
+url = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/app_proxy_widget"
+
 [pos]
 embedded = false
 

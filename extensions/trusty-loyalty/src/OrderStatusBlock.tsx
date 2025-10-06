@@ -8,8 +8,6 @@ import {
   TextField,
   Button,
   Divider,
-  Icon,
-  Pressable,
   View,
 } from "@shopify/ui-extensions-react/customer-account";
 import {
@@ -72,11 +70,29 @@ function DebugCustomer() {
   return null;
 }
 
+// Helpers de formato
+const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
+
+// Devuelve DD/MM/AAAA con ceros delante
+function formatDateDDMMYYYY(iso?: string | null): string {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    if (!Number.isNaN(+d)) {
+      return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
+    }
+  } catch {}
+  // Fallback si viene "YYYY-MM-DD"
+  const [y, m, d] = String(iso).split("T")[0].split("-");
+  if (y && m && d) return `${pad2(Number(d))}/${pad2(Number(m))}/${y}`;
+  return String(iso);
+}
+
 function LoyaltyWidget() {
   const api = useApi();
   const query = (api as any).query as (q: string) => Promise<CustomerIdQueryResult>;
 
-  // 🟣 FLAG DEBUG UI: dejar en false para ocultar el texto de depuración en pantalla.
+  // 🟣 FLAG DEBUG UI
   const SHOW_DEBUG = false;
 
   const customer = useAuthenticatedCustomer();
@@ -420,7 +436,22 @@ function LoyaltyWidget() {
 
   async function copyCodeToClipboard(code: string) {
     try {
-      await (navigator as any)?.clipboard?.writeText(code);
+      // 1) API moderna
+      if ((navigator as any)?.clipboard?.writeText) {
+        await (navigator as any).clipboard.writeText(code);
+      } else {
+        // 2) Fallback execCommand
+        const ta = document.createElement("textarea");
+        ta.value = code;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.top = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        const ok = document.execCommand("copy");
+        document.body.removeChild(ta);
+        if (!ok) throw new Error("execCommand falló");
+      }
       setState((p) => ({ ...p, msg: "Código copiado al portapapeles ✅" }));
     } catch {
       setState((p) => ({ ...p, msg: "No se pudo copiar. Copia manualmente." }));
@@ -544,7 +575,7 @@ function LoyaltyWidget() {
 
               <Divider />
 
-              {/* Campo de canje moderno */}
+              {/* Campo de canje */}
               <BlockStack spacing="base">
                 <Text emphasis="bold">💰 Canjear Puntos</Text>
                 <InlineStack spacing="base" blockAlignment="end">
@@ -556,20 +587,19 @@ function LoyaltyWidget() {
                       onChange={(value) => setState((prev) => ({ ...prev, points: value }))}
                     />
                   </BlockStack>
-                  <Pressable onPress={handleRedeem}>
-                    <View 
-                      border="base" 
-                      cornerRadius="base" 
-                      padding="tight"
-                      background="subdued"
-                    >
-                      <Text emphasis="bold">✨ Canjear</Text>
-                    </View>
-                  </Pressable>
+
+                  {/* Botón oficial (colores permitidos por Shopify) */}
+                  <Button
+                    kind="primary"
+                    onPress={handleRedeem}
+                    accessibilityLabel="Canjear puntos"
+                  >
+                    ✨ Canjear
+                  </Button>
                 </InlineStack>
               </BlockStack>
 
-              {/* Mensajes de estado elegantes */}
+              {/* Mensajes de estado */}
               {state.msg && (
                 <View 
                   border="base" 
@@ -580,48 +610,31 @@ function LoyaltyWidget() {
                 </View>
               )}
 
-              {/* Código generado con diseño premium */}
+              {/* Código generado (alineado a la izquierda, sin caja envolvente) */}
               {state.generatedCode && (
-                <View 
-                  border="base" 
-                  cornerRadius="large" 
-                  padding="base"
-                >
-                  <BlockStack spacing="tight" inlineAlignment="center">
-                    <Text size="large" emphasis="bold">🎉 ¡Código Generado!</Text>
-                    
-                    <View 
-                      border="base" 
-                      cornerRadius="base" 
-                      padding="tight"
-                    >
-                      <Text 
-                        emphasis="bold" 
-                        size="medium"
-                      >
-                        {state.generatedCode}
-                      </Text>
-                    </View>
-                    
-                    {state.amount != null && (
-                      <Text appearance="success" size="small">
-                        💰 Vale por {String(state.amount)}€
-                        {state.expiresAt ? ` • Caduca: ${state.expiresAt}` : ""}
-                      </Text>
-                    )}
-                    
-                    <Pressable onPress={() => copyCodeToClipboard(state.generatedCode!)}>
-                      <View 
-                        border="base" 
-                        cornerRadius="base" 
-                        padding="tight"
-                        background="subdued"
-                      >
-                        <Text emphasis="bold">📋 Copiar Código</Text>
-                      </View>
-                    </Pressable>
-                  </BlockStack>
-                </View>
+                <BlockStack spacing="tight" inlineAlignment="start">
+                  <Text size="large" emphasis="bold">🎉 ¡Código Generado!</Text>
+                  
+                  <View border="base" cornerRadius="base" padding="tight">
+                    <Text emphasis="bold" size="medium">
+                      {state.generatedCode}
+                    </Text>
+                  </View>
+                  
+                  {state.amount != null && (
+                    <Text appearance="success" size="medium">
+                      Vale por {String(state.amount)}€ • Caduca: {formatDateDDMMYYYY(state.expiresAt)}
+                    </Text>
+                  )}
+
+                  <Button
+                    kind="secondary"
+                    onPress={() => copyCodeToClipboard(state.generatedCode!)}
+                    accessibilityLabel="Copiar código de descuento"
+                  >
+                    📋 Copiar Código
+                  </Button>
+                </BlockStack>
               )}
             </BlockStack>
           </View>
@@ -635,7 +648,7 @@ function LoyaltyWidget() {
             padding="base"
           >
             <BlockStack spacing="base">
-              {/* Header de cumpleaños con estilo */}
+              {/* Header de cumpleaños */}
               <InlineStack spacing="tight" blockAlignment="center">
                 <Text size="extraLarge">🎂</Text>
                 <BlockStack spacing="extraTight">
@@ -650,40 +663,17 @@ function LoyaltyWidget() {
 
               <Divider />
 
-              {/* Estado cuando ya tiene fecha guardada */}
+              {/* Estado cuando ya tiene fecha guardada (izquierda, sin caja envolvente) */}
               {state.existingDob ? (
-                <BlockStack spacing="tight" inlineAlignment="center">
-                  <View 
-                    border="base" 
-                    cornerRadius="base" 
-                    padding="base"
-                  >
-                    <BlockStack spacing="tight" inlineAlignment="center">
-                      <Text size="large">✅</Text>
-                      <Text emphasis="bold">
-                        Fecha Guardada
-                      </Text>
-                      <Text size="small">
-                        {state.existingDob}
-                      </Text>
-                      <Text appearance="success" size="small">
-                        🎁 ¡Recibirás puntos en tu cumpleaños!
-                      </Text>
-                    </BlockStack>
-                  </View>
-                  
-                  {/* Botón deshabilitado con estilo grisáceo */}
-                  <View 
-                    border="base" 
-                    cornerRadius="base" 
-                    padding="tight"
-                    background="subdued"
-                  >
-                    <Text emphasis="bold" appearance="subdued">✅ Fecha Guardada</Text>
-                  </View>
+                <BlockStack spacing="tight" inlineAlignment="start">
+                  <Text emphasis="bold" size="extraLarge">Fecha guardada</Text>
+                  <Text size="medium">{state.existingDob}</Text>
+                  <Text appearance="success" size="small">
+                    🎁 ¡Recibirás puntos en tu cumpleaños!
+                  </Text>
                 </BlockStack>
               ) : (
-                /* Formulario activo con diseño moderno */
+                /* Formulario activo */
                 <BlockStack spacing="base">
                   <Text emphasis="bold">📅 Tu Fecha de Nacimiento</Text>
                   
@@ -696,27 +686,20 @@ function LoyaltyWidget() {
                         disabled={state.dobSaving}
                       />
                     </BlockStack>
-                    <Pressable 
-                      onPress={handleSaveDob}
-                      disabled={state.dobSaving}
-                    >
-                      <View 
-                        border="base" 
-                        cornerRadius="base" 
-                        padding="tight"
-                        background="subdued"
-                      >
-                        <Text emphasis="bold" appearance={state.dobSaving ? "subdued" : undefined}>
-                          {state.dobSaving ? "⏳ Guardando..." : "🎁 Guardar"}
-                        </Text>
-                      </View>
-                    </Pressable>
-                  </InlineStack>
 
+                    <Button
+                      kind="primary"
+                      onPress={handleSaveDob}
+                      loading={state.dobSaving}
+                      accessibilityLabel="Guardar fecha de nacimiento"
+                    >
+                      🎁 {state.dobSaving ? "Guardando…" : "Guardar"}
+                    </Button>
+                  </InlineStack>
                 </BlockStack>
               )}
 
-              {/* Mensajes de error elegantes */}
+              {/* Mensajes de error */}
               {state.dobMsg && (
                 <View 
                   border="base" 
