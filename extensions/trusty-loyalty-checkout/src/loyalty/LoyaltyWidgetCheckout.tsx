@@ -5,8 +5,24 @@ import { Text, BlockStack, TextField, Button } from "@shopify/ui-extensions-reac
 const EDGE_SIGN_LOYALTY_LINK = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/sign_loyalty_link";
 const EDGE_LOYALTY_BALANCE   = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/loyalty_balance"; // OK para saldo con token
 const EDGE_REDEEM_DISCOUNT   = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/redeem_discount_code"; // ⬅️ NUEVO
-const SHOP_DOMAIN            = "sandboxdivain.myshopify.com";
 // =====================
+
+// Detecta el shop domain dinámicamente
+function detectShopDomain(): string {
+  if (typeof window !== "undefined") {
+    const hostname = window.location.hostname;
+    // Si estamos en un dominio de Shopify checkout
+    // el formato puede ser: shop-name.myshopify.com o checkout.shop-name.com
+    if (hostname.includes("myshopify.com")) {
+      const match = hostname.match(/([^.]+)\.myshopify\.com/);
+      if (match) {
+        return `${match[1]}.myshopify.com`;
+      }
+    }
+  }
+  // Fallback: usar sandbox como default
+  return "sandboxdivain.myshopify.com";
+}
 
 
 // 👉 helper para formatear fechas a DD/MM/AAAA
@@ -37,6 +53,8 @@ function formUrlEncoded(obj: Record<string, string | number | undefined | null>)
 type Props = { email: string };
 
 export function LoyaltyWidgetCheckout({ email }: Props) {
+  const [shopDomain] = React.useState(() => detectShopDomain());
+  
   const [state, setState] = React.useState({
     loading: true,
     balance: null as number | null,
@@ -50,7 +68,7 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
 
   async function getTokenByEmail(mail: string): Promise<string> {
     const url = new URL(EDGE_SIGN_LOYALTY_LINK);
-    url.searchParams.set("shop_domain", SHOP_DOMAIN);
+    url.searchParams.set("shop_domain", shopDomain);
     url.searchParams.set("email", mail);
     const res = await fetch(url.toString(), { method: "GET" });
     const json = await res.json().catch(() => ({}));
@@ -107,7 +125,7 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
       {
         const preUrl = new URL(EDGE_REDEEM_DISCOUNT);
         preUrl.searchParams.set("preflight", "true");
-        preUrl.searchParams.set("shop", SHOP_DOMAIN);
+        preUrl.searchParams.set("shop", shopDomain);
         const preRes = await fetch(preUrl.toString(), {
           method: "POST",
           headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -131,7 +149,7 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
 
       // 3) Canje real con el endpoint nuevo
       const redUrl = new URL(EDGE_REDEEM_DISCOUNT);
-      redUrl.searchParams.set("shop", SHOP_DOMAIN);
+      redUrl.searchParams.set("shop", shopDomain);
       const redRes = await fetch(redUrl.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },

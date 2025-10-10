@@ -114,6 +114,7 @@ function LoyaltyWidget() {
     dobSaving: boolean;
     dobMsg: string | null;
     existingDob: string | null;
+    shopDomain: string | null;
     debug: {
       runtimeGid: string | null;
       runtimeNumeric: string | null;
@@ -139,6 +140,7 @@ function LoyaltyWidget() {
     dobSaving: false,
     dobMsg: null,
     existingDob: null,
+    shopDomain: null,
     debug: {
       runtimeGid,
       runtimeNumeric,
@@ -150,11 +152,36 @@ function LoyaltyWidget() {
     },
   });
 
-  // ⚠️ Por ahora fijo a la DEV store para pruebas controladas.
-  const shopDomain = "sandboxdivain.myshopify.com"; // TODO: parametrizar en prod
-
   const SUPABASE_EDGE = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1";
-  async function fetchBalance(usedGid: string | null) {
+  
+  async function detectShopDomain(): Promise<string> {
+    // Intenta obtener el shop domain desde la URL del navegador
+    if (typeof window !== "undefined") {
+      const hostname = window.location.hostname;
+      // Si estamos en un dominio de Shopify customer account
+      // el formato es: shop-name.account.myshopify.com o similar
+      if (hostname.includes("myshopify.com")) {
+        const match = hostname.match(/([^.]+)\.(?:account\.)?myshopify\.com/);
+        if (match) {
+          return `${match[1]}.myshopify.com`;
+        }
+      }
+    }
+    
+    // Fallback: intenta con GraphQL
+    try {
+      const result = await query(`query { shop { myshopifyDomain } }`);
+      const domain = (result as any)?.data?.shop?.myshopifyDomain;
+      if (domain) return domain;
+    } catch {
+      // Si falla, continuamos con el fallback final
+    }
+    
+    // Último fallback: usar sandbox como default
+    return "sandboxdivain.myshopify.com";
+  }
+
+  async function fetchBalance(usedGid: string | null, shopDomain: string) {
     try {
       const { numeric } = normalizeCustomerId(usedGid);
       if (!numeric) throw new Error("Sin sesión de cliente.");
@@ -177,7 +204,7 @@ function LoyaltyWidget() {
     }
   }   
 
-  async function fetchExistingDob(usedGid: string | null) {
+  async function fetchExistingDob(usedGid: string | null, shopDomain: string) {
     try {
       const { numeric } = normalizeCustomerId(usedGid);
       if (!numeric) return;
@@ -206,6 +233,14 @@ function LoyaltyWidget() {
       const href = typeof window !== "undefined" ? window.location.href : "";
 
       try {
+        // Detectar shop domain primero
+        const detectedShopDomain = await detectShopDomain();
+        notes.push(`Shop domain detectado: ${detectedShopDomain}`);
+        
+        if (!cancelled) {
+          setState((prev) => ({ ...prev, shopDomain: detectedShopDomain }));
+        }
+
         if (preview) {
           setState({
             loading: false,
@@ -221,6 +256,7 @@ function LoyaltyWidget() {
             dobSaving: false,
             dobMsg: null,
             existingDob: null,
+            shopDomain: detectedShopDomain,
             debug: {
               runtimeGid: runtimeGid,
               runtimeNumeric: runtimeNumeric,
@@ -286,6 +322,7 @@ function LoyaltyWidget() {
               dobSaving: false,
               dobMsg: null,
               existingDob: null,
+              shopDomain: detectedShopDomain,
               debug: {
                 runtimeGid: runtimeGid,
                 runtimeNumeric: runtimeNumeric,
@@ -305,7 +342,7 @@ function LoyaltyWidget() {
           return;
         }
 
-        await Promise.all([fetchBalance(usedGid), fetchExistingDob(usedGid)]);
+        await Promise.all([fetchBalance(usedGid, detectedShopDomain), fetchExistingDob(usedGid, detectedShopDomain)]);
 
         if (!cancelled) {
           setState((prev) => ({
@@ -379,8 +416,9 @@ function LoyaltyWidget() {
     const usedGid = usedGidParam ?? state.debug.usedGid;
     const { numeric } = normalizeCustomerId(usedGid);
     if (!usedGid || !numeric) throw new Error("Sin sesión de cliente.");
+    if (!state.shopDomain) throw new Error("Shop domain no detectado.");
     const tokUrl = new URL(`${SUPABASE_EDGE}/sign_loyalty_link`);
-    tokUrl.searchParams.set("shop_domain", shopDomain);
+    tokUrl.searchParams.set("shop_domain", state.shopDomain);
     tokUrl.searchParams.set("shopify_customer_id", numeric);
     const tokRes = await fetch(tokUrl.toString(), { method: "GET" });
     const tok = await tokRes.json();
@@ -400,6 +438,7 @@ function LoyaltyWidget() {
       const points = parseInt(state.points, 10);
   
       if (!usedGidLocal || !numeric) throw new Error("Sin sesión de cliente.");
+      if (!state.shopDomain) throw new Error("Shop domain no detectado.");
       if (!Number.isInteger(points) || points <= 0) {
         setState((prev) => ({ ...prev, msg: "Introduce un número de puntos válido." }));
         return;
@@ -408,7 +447,7 @@ function LoyaltyWidget() {
       const token = await getTokenForCustomer(usedGidLocal);
   
       const redRes = await fetch(
-        `${SUPABASE_EDGE}/redeem_discount_code?shop=${shopDomain}`,
+        `${SUPABASE_EDGE}/redeem_discount_code?shop=${state.shopDomain}`,
         { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: formEncode({ token, points }) }
       );
       const rj = await redRes.json().catch(() => ({} as any));
@@ -428,7 +467,9 @@ function LoyaltyWidget() {
   
       setState((prev) => ({ ...prev, msg: null, generatedCode: code, amount, expiresAt, points: "" }));
   
-      await fetchBalance(usedGidLocal);
+      if (state.shopDomain) {
+        await fetchBalance(usedGidLocal, state.shopDomain);
+      }
     } catch (e: any) {
       setState((prev) => ({ ...prev, msg: e?.message || "Error en el canje." }));
     }
@@ -459,11 +500,12 @@ function LoyaltyWidget() {
       }
       const dobISO = parsed.iso;
 
+      if (!state.shopDomain) throw new Error("Shop domain no detectado.");
       const token = await getTokenForCustomer();
       const res = await fetch(`${SUPABASE_EDGE}/set_date_of_birth`, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ token, date_of_birth: dobISO, shop_domain: shopDomain }).toString(),
+        body: new URLSearchParams({ token, date_of_birth: dobISO, shop_domain: state.shopDomain }).toString(),
       });
       const j = await res.json().catch(() => ({} as any));
       if (!res.ok || j?.ok === false) throw new Error(j?.error || `Error HTTP ${res.status}`);
