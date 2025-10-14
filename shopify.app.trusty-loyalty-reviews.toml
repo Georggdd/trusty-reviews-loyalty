@@ -14,9 +14,9 @@ redirect_urls = [
   "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/auth_callback"
 ]
 
-# ⬇️ Scopes restaurados (una sola línea, sin espacios)
+# ⬇️ Scopes actualizados para loyalty
 [access_scopes]
-scopes = "read_customers,read_price_rules,write_price_rules,read_discounts,write_discounts,write_draft_orders,read_draft_orders,read_orders"
+scopes = "read_customers,write_customers,read_price_rules,write_price_rules,read_discounts,write_discounts,write_draft_orders,read_draft_orders,read_orders"
 
 # ⬇️ App Proxy restaurado
 [app_proxy]

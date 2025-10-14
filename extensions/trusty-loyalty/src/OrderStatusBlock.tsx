@@ -157,6 +157,7 @@ function LoyaltyWidget() {
   const SUPABASE_EDGE = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1";
   
   async function detectShopDomain(): Promise<string> {
+    // 🚨 TEMPORAL: Forzar detección para testing
     if (typeof window === "undefined") {
       console.warn('⚠️ Window not available, using fallback');
       return "sandboxdivain.myshopify.com";
@@ -172,6 +173,9 @@ function LoyaltyWidget() {
       'account.divainparfums.com': 'divainusa.myshopify.com', 
       'account.divainparfums.es': 'divaines.myshopify.com',
     };
+    
+    // 🚨 TEMPORAL: Verificar detección con logs extra
+    console.log('🔍 Custom domain check:', { hostname, hasDomain: !!customDomainMap[hostname] });
     
     // 1. Check custom domain mapping first
     if (customDomainMap[hostname]) {
