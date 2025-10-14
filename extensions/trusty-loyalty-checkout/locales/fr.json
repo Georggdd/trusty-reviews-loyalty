@@ -1,6 +1,14 @@
 {
-  "welcome": "Bienvenue dans l'extension {{target}}!",
-  "iWouldLikeAFreeGiftWithMyOrder": "Je souhaite recevoir un cadeau gratuit avec ma commande",
-  "addAFreeGiftToMyOrder": "Ajouter un cadeau gratuit à ma commande",
-  "attributeChangesAreNotSupported": "Les modifications d'attribut ne sont pas prises en charge dans cette commande"
+  "loading": "Chargement de vos points…",
+  "errorLoadBalance": "Impossible de charger le solde",
+  "yourBalance": "Votre solde de points: {{balance}}",
+  "pointsToRedeem": "Points à échanger (100 → 5€, 200 → 10€)",
+  "redeem": "Échanger",
+  "codeGenerated": "Code généré:",
+  "expiresOn": "Expire le: {{date}}",
+  "errorInvalidPoints": "Entrez un nombre de points valide.",
+  "errorInsufficientBalance": "Solde insuffisant. Vous avez {{available}} points.",
+  "errorRedemptionOption": "Aucune option d'échange pour {{points}} points.",
+  "errorInvalidToken": "Jeton invalide. Saisissez à nouveau votre email ou actualisez la page.",
+  "errorRedeemGeneral": "Erreur lors de l'échange."
 }

@@ -1,0 +1,16 @@
+{
+  "loading": "Cargando tus puntos…",
+  "errorLoadBalance": "No se pudo cargar el saldo",
+  "yourBalance": "Tu saldo de puntos: {{balance}}",
+  "pointsToRedeem": "Puntos a canjear (100 → 5€, 200 → 10€)",
+  "redeem": "Canjear",
+  "codeGenerated": "Código generado:",
+  "expiresOn": "Caduca el: {{date}}",
+  "errorInvalidPoints": "Introduce un número de puntos válido.",
+  "errorInsufficientBalance": "Saldo insuficiente. Tienes {{available}} puntos.",
+  "errorRedemptionOption": "No hay opción de canje para {{points}} puntos.",
+  "errorInvalidToken": "Token inválido. Vuelve a introducir el email o recarga la página.",
+  "errorRedeemGeneral": "Error en el canje."
+}
+
+

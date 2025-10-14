@@ -1,0 +1,32 @@
+{
+  "loading": "Cargando tus puntos…",
+  "points": "Puntos",
+  "availableBalance": "Tu saldo disponible",
+  "redeemPoints": "Canjear Puntos",
+  "amountOfPoints": "Cantidad de puntos",
+  "redeem": "Canjear",
+  "codeGenerated": "Código generado:",
+  "worthAmount": "Vale por {{amount}}€ • Caduca el: {{date}}",
+  "celebrateBirthday": "¡Celebra tu Cumpleaños!",
+  "birthdayReward": "Recibe 15 puntos de regalo",
+  "dateOfBirth": "Tu Fecha de Nacimiento",
+  "datePlaceholder": "Fecha (DD-MM-YYYY)",
+  "save": "Guardar",
+  "saving": "Guardando…",
+  "dateSaved": "Fecha guardada:",
+  "birthdayPointsInfo": "¡Recibirás puntos en tu cumpleaños!",
+  "errorNoSession": "No se pudo identificar tu sesión de cliente. Cierra sesión y vuelve a entrar en la cuenta de la tienda.",
+  "errorLoadBalance": "No se pudo cargar el saldo",
+  "errorInvalidPoints": "Introduce un número de puntos válido.",
+  "errorInsufficientBalance": "Saldo insuficiente. Tienes {{available}} puntos, necesitas {{required}}.",
+  "errorRedemptionOption": "Solo puedes canjear 100 o 200 puntos. Ajusta la cantidad e inténtalo de nuevo.",
+  "errorInvalidToken": "Token inválido. Cierra sesión y vuelve a entrar.",
+  "errorRedeemGeneral": "Error en el canje.",
+  "errorDateFormat": "Formato esperado DD-MM-YYYY (admite 01011990, 01/01/1990, 01.01.1990).",
+  "errorSaveDate": "No se pudo guardar",
+  "previewMode": "Estás en vista PREVIEW del editor. Cierra la vista previa (Close preview) y abre la cuenta de cliente en una pestaña normal para que exista sesión.",
+  "noSession": "Asegúrate de NO estar en preview y de usar https://shopify.com/…/account.",
+  "shopDomainNotDetected": "Shop domain no detectado."
+}
+
+

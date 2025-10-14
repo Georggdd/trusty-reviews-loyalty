@@ -1,6 +1,14 @@
 {
-  "welcome": "Welcome to the {{target}} extension!",
-  "iWouldLikeAFreeGiftWithMyOrder": "I would like to receive a free gift with my order",
-  "addAFreeGiftToMyOrder": "Add a free gift to my order",
-  "attributeChangesAreNotSupported": "Attribute changes are not supported in this checkout"
+  "loading": "Loading your points…",
+  "errorLoadBalance": "Could not load balance",
+  "yourBalance": "Your points balance: {{balance}}",
+  "pointsToRedeem": "Points to redeem (100 → 5€, 200 → 10€)",
+  "redeem": "Redeem",
+  "codeGenerated": "Code generated:",
+  "expiresOn": "Expires on: {{date}}",
+  "errorInvalidPoints": "Enter a valid number of points.",
+  "errorInsufficientBalance": "Insufficient balance. You have {{available}} points.",
+  "errorRedemptionOption": "No redemption option for {{points}} points.",
+  "errorInvalidToken": "Invalid token. Re-enter your email or refresh the page.",
+  "errorRedeemGeneral": "Error redeeming."
 }

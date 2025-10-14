@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Text, BlockStack, TextField, Button } from "@shopify/ui-extensions-react/checkout";
+import { Text, BlockStack, TextField, Button, useTranslate } from "@shopify/ui-extensions-react/checkout";
 
 // ====== CONFIG ======
 const EDGE_SIGN_LOYALTY_LINK = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/sign_loyalty_link";
@@ -9,18 +9,50 @@ const EDGE_REDEEM_DISCOUNT   = "https://tizzlfjuosqfyefybdee.supabase.co/functio
 
 // Detecta el shop domain dinámicamente
 function detectShopDomain(): string {
-  if (typeof window !== "undefined") {
-    const hostname = window.location.hostname;
-    // Si estamos en un dominio de Shopify checkout
-    // el formato puede ser: shop-name.myshopify.com o checkout.shop-name.com
-    if (hostname.includes("myshopify.com")) {
-      const match = hostname.match(/([^.]+)\.myshopify\.com/);
-      if (match) {
-        return `${match[1]}.myshopify.com`;
-      }
+  if (typeof window === "undefined") {
+    console.warn('⚠️ Window not available in checkout, using fallback');
+    return "sandboxdivain.myshopify.com";
+  }
+
+  const hostname = window.location.hostname;
+  const href = window.location.href;
+  console.log('🔍 Checkout: Detecting shop domain from:', { hostname, href });
+  
+  // Mapeo de dominios de checkout a tiendas
+  const customDomainMap: Record<string, string> = {
+    'checkout.divainparfums.co': 'divainusa.myshopify.com',
+    'checkout.divainparfums.com': 'divainusa.myshopify.com',
+    'checkout.divainparfums.es': 'divaines.myshopify.com',
+  };
+  
+  // 1. Check custom domain mapping first
+  if (customDomainMap[hostname]) {
+    console.log('✅ Shop domain from custom checkout domain:', customDomainMap[hostname]);
+    return customDomainMap[hostname];
+  }
+  
+  // 2. Si estamos en myshopify.com checkout
+  if (hostname.includes("myshopify.com")) {
+    const match = hostname.match(/([^.]+)\.myshopify\.com/);
+    if (match) {
+      const detected = `${match[1]}.myshopify.com`;
+      console.log('✅ Shop domain from checkout URL:', detected);
+      return detected;
     }
   }
-  // Fallback: usar sandbox como default
+  
+  // 3. Intentar desde URL (puede tener pistas)
+  if (href.includes('divainusa')) {
+    console.log('✅ Shop domain inferred from URL content: divainusa');
+    return 'divainusa.myshopify.com';
+  }
+  if (href.includes('divaines')) {
+    console.log('✅ Shop domain inferred from URL content: divaines');
+    return 'divaines.myshopify.com';
+  }
+  
+  // Fallback
+  console.warn('⚠️ Using fallback shop domain in checkout');
   return "sandboxdivain.myshopify.com";
 }
 
@@ -53,6 +85,7 @@ function formUrlEncoded(obj: Record<string, string | number | undefined | null>)
 type Props = { email: string };
 
 export function LoyaltyWidgetCheckout({ email }: Props) {
+  const translate = useTranslate();
   const [shopDomain] = React.useState(() => detectShopDomain());
   
   const [state, setState] = React.useState({
@@ -73,7 +106,7 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
     const res = await fetch(url.toString(), { method: "GET" });
     const json = await res.json().catch(() => ({}));
     if (!res.ok || !json?.ok || !json?.token) {
-      throw new Error(json?.error || "No se pudo obtener autorización.");
+      throw new Error(json?.error || translate('errorInvalidToken'));
     }
     return json.token as string;
   }
@@ -99,7 +132,7 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
         const balance = await fetchBalanceByEmail(email);
         if (!cancelled) setState((s) => ({ ...s, loading: false, balance, error: null }));
       } catch {
-        if (!cancelled) setState((s) => ({ ...s, loading: false, error: "No se pudo cargar el saldo" }));
+        if (!cancelled) setState((s) => ({ ...s, loading: false, error: translate('errorLoadBalance') }));
       }
     })();
     return () => {
@@ -114,7 +147,7 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
       const points = parseInt(state.points, 10);
       if (!email) return;
       if (!Number.isInteger(points) || points <= 0) {
-        setState((p) => ({ ...p, msg: "Introduce un número de puntos válido." }));
+        setState((p) => ({ ...p, msg: translate('errorInvalidPoints') }));
         return;
       }
 
@@ -136,11 +169,11 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
         if (!ok) {
           const err = (pj?.error || "").toString();
           if (err === "no_redemption_option") {
-            setState((p) => ({ ...p, msg: pj?.message || `No hay opción de canje para ${points} puntos.` }));
+            setState((p) => ({ ...p, msg: pj?.message || translate('errorRedemptionOption', { points }) }));
             return;
           }
           if (err === "Insufficient points" || err === "insufficient_balance") {
-            setState((p) => ({ ...p, msg: `Saldo insuficiente. Tienes ${pj?.available ?? pj?.currentBalance ?? "0"} puntos.` }));
+            setState((p) => ({ ...p, msg: String(translate('errorInsufficientBalance', { available: pj?.available ?? pj?.currentBalance ?? "0" })) }));
             return;
           }
           throw new Error(err || "Error preflight");
@@ -161,18 +194,18 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
       if (!ok) {
         const err = (rj?.error || "").toString();
         if (err === "no_redemption_option") {
-          setState((p) => ({ ...p, msg: rj.message || `No hay opción de canje para ${points} puntos.` }));
+          setState((p) => ({ ...p, msg: rj.message || translate('errorRedemptionOption', { points }) }));
           return;
         }
         if (err === "Insufficient points" || err === "INSUFFICIENT_BALANCE") {
-          setState((p) => ({ ...p, msg: `Saldo insuficiente. Tienes ${rj.available} puntos, necesitas ${rj.required}.` }));
+          setState((p) => ({ ...p, msg: String(translate('errorInsufficientBalance', { available: rj.available })) }));
           return;
         }
         if (err === "invalid_token") {
-          setState((p) => ({ ...p, msg: `Token inválido. Vuelve a introducir el email o recarga la página.` }));
+          setState((p) => ({ ...p, msg: translate('errorInvalidToken') }));
           return;
         }
-        throw new Error(err || `No se pudo canjear (HTTP ${redRes.status}).`);
+        throw new Error(err || `HTTP ${redRes.status}`);
       }
 
       // 4) Extrae datos (tolerante a claves antiguas/nuevas)
@@ -184,7 +217,7 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
 
       setState((p) => ({
         ...p,
-        msg: "Código generado:",
+        msg: translate('codeGenerated'),
         generatedCode: code,
         amount,
         expiresAt: expires,
@@ -195,26 +228,26 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
       const newBalance = await fetchBalanceByEmail(email);
       setState((p) => ({ ...p, balance: newBalance }));
     } catch (e: any) {
-      setState((p) => ({ ...p, msg: e?.message || "Error en el canje." }));
+      setState((p) => ({ ...p, msg: e?.message || translate('errorRedeemGeneral') }));
     }
   }
 
-  if (state.loading) return <Text>Cargando tus puntos…</Text>;
+  if (state.loading) return <Text>{translate('loading')}</Text>;
   if (state.error)   return <Text>{state.error}</Text>;
 
   return (
     <BlockStack spacing="loose">
-      <Text>Tu saldo de puntos: {state.balance ?? 0}</Text>
+      <Text>{translate('yourBalance', { balance: state.balance ?? 0 })}</Text>
 
       <TextField
-        label="Puntos a canjear (100 → 5€, 200 → 10€)"
+        label={translate('pointsToRedeem')}
         type="number"
         value={state.points}
         onChange={(value) => setState((p) => ({ ...p, points: value }))}
       />
 
       <Button kind="primary" onPress={handleRedeem}>
-        Canjear
+        {translate('redeem')}
       </Button>
 
       {state.msg && !state.generatedCode && <Text>{state.msg}</Text>}
@@ -225,7 +258,7 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
             {state.msg} <Text emphasis="bold">{state.generatedCode}</Text>
           </Text>
           {state.amount != null && (
-             <Text>Caduca el: {formatDateDDMMYYYY(state.expiresAt)}.</Text>
+             <Text>{translate('expiresOn', { date: formatDateDDMMYYYY(state.expiresAt) })}</Text>
             )}
         </BlockStack>
       )}

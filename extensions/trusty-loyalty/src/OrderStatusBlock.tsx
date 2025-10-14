@@ -9,6 +9,7 @@ import {
   Button,
   Divider,
   View,
+  useTranslate,
 } from "@shopify/ui-extensions-react/customer-account";
 import {
   useAuthenticatedAccountCustomer as useAuthenticatedCustomer,
@@ -91,6 +92,7 @@ function formatDateDDMMYYYY(iso?: string | null): string {
 function LoyaltyWidget() {
   const api = useApi();
   const query = (api as any).query as (q: string) => Promise<CustomerIdQueryResult>;
+  const translate = useTranslate();
 
   // 🟣 FLAG DEBUG UI
   const SHOW_DEBUG = false;
@@ -155,36 +157,75 @@ function LoyaltyWidget() {
   const SUPABASE_EDGE = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1";
   
   async function detectShopDomain(): Promise<string> {
-    // Intenta obtener el shop domain desde la URL del navegador
-    if (typeof window !== "undefined") {
-      const hostname = window.location.hostname;
-      // Si estamos en un dominio de Shopify customer account
-      // el formato es: shop-name.account.myshopify.com o similar
-      if (hostname.includes("myshopify.com")) {
-        const match = hostname.match(/([^.]+)\.(?:account\.)?myshopify\.com/);
-        if (match) {
-          return `${match[1]}.myshopify.com`;
-        }
+    if (typeof window === "undefined") {
+      console.warn('⚠️ Window not available, using fallback');
+      return "sandboxdivain.myshopify.com";
+    }
+
+    const hostname = window.location.hostname;
+    const href = window.location.href;
+    console.log('🔍 Detecting shop domain from:', { hostname, href });
+    
+    // Mapeo de dominios personalizados a tiendas (PRIMERO porque es más confiable)
+    const customDomainMap: Record<string, string> = {
+      'account.divainparfums.co': 'divainusa.myshopify.com',
+      'account.divainparfums.com': 'divainusa.myshopify.com', 
+      'account.divainparfums.es': 'divaines.myshopify.com',
+    };
+    
+    // 1. Check custom domain mapping first
+    if (customDomainMap[hostname]) {
+      console.log('✅ Shop domain from custom domain map:', customDomainMap[hostname]);
+      return customDomainMap[hostname];
+    }
+    
+    // 2. Extraer de URL si es myshopify.com
+    if (hostname.includes('.myshopify.com')) {
+      const match = hostname.match(/([^.]+)\.(?:account\.)?myshopify\.com/);
+      if (match) {
+        const detected = `${match[1]}.myshopify.com`;
+        console.log('✅ Shop domain from myshopify URL:', detected);
+        return detected;
       }
     }
     
-    // Fallback: intenta con GraphQL
+    // 3. Intentar desde parámetros de URL (region_country puede dar pistas)
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const regionCountry = urlParams.get('region_country');
+      if (regionCountry === 'US') {
+        console.log('✅ Shop domain inferred from region_country=US');
+        return 'divainusa.myshopify.com';
+      }
+      if (regionCountry === 'ES') {
+        console.log('✅ Shop domain inferred from region_country=ES');
+        return 'divaines.myshopify.com';
+      }
+    } catch (err) {
+      console.warn('⚠️ Could not parse URL params:', err);
+    }
+    
+    // 4. Último intento con GraphQL (puede no funcionar en Customer Account)
     try {
       const result = await query(`query { shop { myshopifyDomain } }`);
       const domain = (result as any)?.data?.shop?.myshopifyDomain;
-      if (domain) return domain;
-    } catch {
-      // Si falla, continuamos con el fallback final
+      if (domain) {
+        console.log('✅ Shop domain from GraphQL:', domain);
+        return domain;
+      }
+    } catch (err) {
+      console.warn('⚠️ GraphQL shop query failed (expected in Customer Account):', err);
     }
     
-    // Último fallback: usar sandbox como default
+    // Último fallback
+    console.warn('⚠️ Using fallback shop domain: sandboxdivain.myshopify.com');
     return "sandboxdivain.myshopify.com";
   }
 
   async function fetchBalance(usedGid: string | null, shopDomain: string) {
     try {
       const { numeric } = normalizeCustomerId(usedGid);
-      if (!numeric) throw new Error("Sin sesión de cliente.");
+      if (!numeric) throw new Error(translate('errorNoSession'));
   
       // loyalty_balance_ui espera el ID numérico (o el GID). No usa token.
       const url = new URL(`${SUPABASE_EDGE}/loyalty_balance_ui`);
@@ -200,7 +241,7 @@ function LoyaltyWidget() {
   
       setState((prev) => ({ ...prev, balance: json.balance, error: null }));
     } catch {
-      setState((prev) => ({ ...prev, error: "No se pudo cargar el saldo" }));
+      setState((prev) => ({ ...prev, error: translate('errorLoadBalance') }));
     }
   }   
 
@@ -208,19 +249,28 @@ function LoyaltyWidget() {
     try {
       const { numeric } = normalizeCustomerId(usedGid);
       if (!numeric) return;
+      
       const url = new URL(`${SUPABASE_EDGE}/get_customer_profile_ui`);
       url.searchParams.set("shop_domain", shopDomain);
       url.searchParams.set("shopify_customer_id", numeric);
+      
+      console.log('📡 Fetching DOB with:', { shopDomain, shopify_customer_id: numeric });
+      
       const res = await fetch(url.toString(), { method: "GET" });
-      if (!res.ok) return;
+      if (!res.ok) {
+        console.warn('fetchExistingDob failed:', res.status);
+        return;
+      }
+      
       const j = await res.json();
       if (j?.date_of_birth) {
         const [y, m, d] = String(j.date_of_birth).split("-");
         const ddmmyyyy = (y && m && d) ? `${d}-${m}-${y}` : j.date_of_birth;
         setState((p) => ({ ...p, existingDob: ddmmyyyy, dob: ddmmyyyy }));
+        console.log('✅ DOB loaded:', ddmmyyyy);
       }
-    } catch {
-      // silencio
+    } catch (err) {
+      console.warn('fetchExistingDob error:', err);
     }
   }
 
@@ -245,8 +295,7 @@ function LoyaltyWidget() {
           setState({
             loading: false,
             balance: null,
-            error:
-              "Estás en vista PREVIEW del editor. Cierra la vista previa (Close preview) y abre la cuenta de cliente en una pestaña normal para que exista sesión.",
+            error: translate('previewMode'),
             points: "",
             msg: null,
             generatedCode: null,
@@ -311,8 +360,7 @@ function LoyaltyWidget() {
             setState({
               loading: false,
               balance: null,
-              error:
-                "No se pudo identificar tu sesión de cliente. Cierra sesión y vuelve a entrar en la cuenta de la tienda.",
+              error: translate('errorNoSession'),
               points: "",
               msg: null,
               generatedCode: null,
@@ -330,7 +378,7 @@ function LoyaltyWidget() {
                 usedGid: null,
                 notes: [
                   ...notes,
-                  "Asegúrate de NO estar en preview y de usar https://shopify.com/…/account.",
+                  translate('noSession'),
                 ],
                 email: finalEmail,
                 name: queryName,
@@ -367,7 +415,7 @@ function LoyaltyWidget() {
           setState((prev) => ({
             ...prev,
             loading: false,
-            error: "No se pudo cargar el saldo",
+            error: translate('errorLoadBalance'),
           }));
         }
       }
@@ -415,15 +463,15 @@ function LoyaltyWidget() {
   async function getTokenForCustomer(usedGidParam?: string | null): Promise<string> {
     const usedGid = usedGidParam ?? state.debug.usedGid;
     const { numeric } = normalizeCustomerId(usedGid);
-    if (!usedGid || !numeric) throw new Error("Sin sesión de cliente.");
-    if (!state.shopDomain) throw new Error("Shop domain no detectado.");
+    if (!usedGid || !numeric) throw new Error(translate('errorNoSession'));
+    if (!state.shopDomain) throw new Error(translate('shopDomainNotDetected'));
     const tokUrl = new URL(`${SUPABASE_EDGE}/sign_loyalty_link`);
     tokUrl.searchParams.set("shop_domain", state.shopDomain);
     tokUrl.searchParams.set("shopify_customer_id", numeric);
     const tokRes = await fetch(tokUrl.toString(), { method: "GET" });
     const tok = await tokRes.json();
     if (!tokRes.ok || !tok?.ok || !tok?.token) {
-      throw new Error(tok?.error || "No se pudo obtener autorización.");
+      throw new Error(tok?.error || translate('errorInvalidToken'));
     }
     return tok.token as string;
   }  
@@ -437,10 +485,10 @@ function LoyaltyWidget() {
       const { numeric } = normalizeCustomerId(usedGidLocal);
       const points = parseInt(state.points, 10);
   
-      if (!usedGidLocal || !numeric) throw new Error("Sin sesión de cliente.");
-      if (!state.shopDomain) throw new Error("Shop domain no detectado.");
+      if (!usedGidLocal || !numeric) throw new Error(translate('errorNoSession'));
+      if (!state.shopDomain) throw new Error(translate('shopDomainNotDetected'));
       if (!Number.isInteger(points) || points <= 0) {
-        setState((prev) => ({ ...prev, msg: "Introduce un número de puntos válido." }));
+        setState((prev) => ({ ...prev, msg: translate('errorInvalidPoints') }));
         return;
       }
   
@@ -455,10 +503,25 @@ function LoyaltyWidget() {
       const ok = redRes.ok && ((rj?.ok === true) || (rj?.success === true));
       if (!ok) {
         const err = (rj?.error || "").toString();
-        if (err === "no_redemption_option") { setState((p) => ({ ...p, msg: rj.message || `Solo puedes canjear 100 o 200 puntos. Ajusta la cantidad e inténtalo de nuevo.` })); return; }
-        if (err === "Insufficient points" || err === "INSUFFICIENT_BALANCE") { setState((p) => ({ ...p, msg: `Saldo insuficiente. Tienes ${rj.available} puntos, necesitas ${rj.required}.` })); return; }
-        if (err === "invalid_token") { setState((p) => ({ ...p, msg: `Token inválido. Cierra sesión y vuelve a entrar.` })); return; }
-        throw new Error(err || `No se pudo canjear (HTTP ${redRes.status}).`);
+        if (err === "no_redemption_option") { 
+          setState((p) => ({ ...p, msg: rj.message || translate('errorRedemptionOption') })); 
+          return; 
+        }
+        if (err === "Insufficient points" || err === "INSUFFICIENT_BALANCE") { 
+          setState((p) => ({ 
+            ...p, 
+            msg: String(translate('errorInsufficientBalance', { 
+              available: rj.available, 
+              required: rj.required 
+            }))
+          })); 
+          return; 
+        }
+        if (err === "invalid_token") { 
+          setState((p) => ({ ...p, msg: translate('errorInvalidToken') })); 
+          return; 
+        }
+        throw new Error(err || `HTTP ${redRes.status}`);
       }
   
       const code = rj.discount_code ?? rj.code ?? null;
@@ -471,7 +534,7 @@ function LoyaltyWidget() {
         await fetchBalance(usedGidLocal, state.shopDomain);
       }
     } catch (e: any) {
-      setState((prev) => ({ ...prev, msg: e?.message || "Error en el canje." }));
+      setState((prev) => ({ ...prev, msg: e?.message || translate('errorRedeemGeneral') }));
     }
   }  
   // ────────────────────────────────────────────────────────────────
@@ -494,13 +557,13 @@ function LoyaltyWidget() {
         setState((p) => ({
           ...p,
           dobSaving: false,
-          dobMsg: "Formato esperado DD-MM-YYYY (admite 01011990, 01/01/1990, 01.01.1990).",
+          dobMsg: translate('errorDateFormat'),
         }));
         return;
       }
       const dobISO = parsed.iso;
 
-      if (!state.shopDomain) throw new Error("Shop domain no detectado.");
+      if (!state.shopDomain) throw new Error(translate('shopDomainNotDetected'));
       const token = await getTokenForCustomer();
       const res = await fetch(`${SUPABASE_EDGE}/set_date_of_birth`, {
         method: "POST",
@@ -520,7 +583,7 @@ function LoyaltyWidget() {
         dob: ddmmyyyy,
       }));
     } catch (e: any) {
-      setState((p) => ({ ...p, dobSaving: false, dobMsg: e?.message || "No se pudo guardar" }));
+      setState((p) => ({ ...p, dobSaving: false, dobMsg: e?.message || translate('errorSaveDate') }));
     }
   }
 
@@ -544,7 +607,7 @@ function LoyaltyWidget() {
     }
   }, []);
 
-  if (state.loading) return <Text>Cargando tus puntos…</Text>;
+  if (state.loading) return <Text>{translate('loading')}</Text>;
 
   return (
     <BlockStack spacing="loose">
@@ -582,10 +645,10 @@ function LoyaltyWidget() {
                 <Text size="extraLarge" emphasis="bold">💎</Text>
                 <BlockStack spacing="extraTight">
                   <Text emphasis="bold" size="large">
-                    {state.balance ?? 0} Puntos
+                    {state.balance ?? 0} {translate('points')}
                   </Text>
                   <Text appearance="subdued" size="small">
-                    Tu saldo disponible
+                    {translate('availableBalance')}
                   </Text>
                 </BlockStack>
               </InlineStack>
@@ -594,11 +657,11 @@ function LoyaltyWidget() {
 
               {/* Campo de canje */}
               <BlockStack spacing="base">
-                <Text emphasis="bold">💰 Canjear Puntos</Text>
+                <Text emphasis="bold">💰 {translate('redeemPoints')}</Text>
                 <InlineStack spacing="base" blockAlignment="end">
                   <BlockStack spacing="extraTight">
                     <TextField
-                      label="Cantidad de puntos"
+                      label={translate('amountOfPoints')}
                       type="number"
                       value={state.points}
                       onChange={(value) => setState((prev) => ({ ...prev, points: value }))}
@@ -609,9 +672,9 @@ function LoyaltyWidget() {
                   <Button
                     kind="primary"
                     onPress={handleRedeem}
-                    accessibilityLabel="Canjear puntos"
+                    accessibilityLabel={translate('redeem')}
                   >
-                     Canjear
+                     {translate('redeem')}
                   </Button>
                 </InlineStack>
               </BlockStack>
@@ -630,7 +693,7 @@ function LoyaltyWidget() {
 {state.generatedCode && (
   <BlockStack spacing="tight" inlineAlignment="start">
     <InlineStack spacing="base" blockAlignment="center">
-      <Text emphasis="bold" size="large">Código generado:</Text>
+      <Text emphasis="bold" size="large">{translate('codeGenerated')}</Text>
       <View border="base" cornerRadius="base" padding="tight">
         <Text emphasis="bold" size="medium">{state.generatedCode}</Text>
       </View>
@@ -638,7 +701,7 @@ function LoyaltyWidget() {
 
     {state.amount != null && (
       <Text appearance="success" size="medium">
-        Vale por {String(state.amount)}€ • Caduca el: {formatDateDDMMYYYY(state.expiresAt)}
+        {translate('worthAmount', { amount: String(state.amount), date: formatDateDDMMYYYY(state.expiresAt) })}
       </Text>
     )}
   </BlockStack>
@@ -661,10 +724,10 @@ function LoyaltyWidget() {
                 <Text size="extraLarge">🎂</Text>
                 <BlockStack spacing="extraTight">
                   <Text emphasis="bold" size="large">
-                    ¡Celebra tu Cumpleaños!
+                    {translate('celebrateBirthday')}
                   </Text>
                   <Text appearance="subdued" size="small">
-                    Recibe 15 puntos de regalo
+                    {translate('birthdayReward')}
                   </Text>
                 </BlockStack>
               </InlineStack>
@@ -675,23 +738,23 @@ function LoyaltyWidget() {
               {state.existingDob ? (
   <BlockStack spacing="tight" inlineAlignment="start">
     <InlineStack spacing="base" blockAlignment="center">
-      <Text emphasis="bold" size="large">Fecha guardada:</Text>
+      <Text emphasis="bold" size="large">{translate('dateSaved')}</Text>
       <Text size="medium">{state.existingDob}</Text>
     </InlineStack>
     <Text appearance="success" size="medium">
-      ¡Recibirás puntos en tu cumpleaños!
+      {translate('birthdayPointsInfo')}
     </Text>
   </BlockStack>
 ) : (
 
                 /* Formulario activo */
                 <BlockStack spacing="base">
-                  <Text emphasis="bold">📅 Tu Fecha de Nacimiento</Text>
+                  <Text emphasis="bold">📅 {translate('dateOfBirth')}</Text>
                   
                   <InlineStack spacing="base" blockAlignment="end">
                     <BlockStack spacing="extraTight">
                       <TextField
-                        label="Fecha (DD-MM-YYYY)"
+                        label={translate('datePlaceholder')}
                         value={state.dob}
                         onChange={(value) => setState((p) => ({ ...p, dob: value }))}
                         disabled={state.dobSaving}
@@ -702,9 +765,9 @@ function LoyaltyWidget() {
                       kind="primary"
                       onPress={handleSaveDob}
                       loading={state.dobSaving}
-                      accessibilityLabel="Guardar fecha de nacimiento"
+                      accessibilityLabel={translate('save')}
                     >
-                       {state.dobSaving ? "Guardando…" : "Guardar"}
+                       {state.dobSaving ? translate('saving') : translate('save')}
                     </Button>
                   </InlineStack>
                 </BlockStack>
