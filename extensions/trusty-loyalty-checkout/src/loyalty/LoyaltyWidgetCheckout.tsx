@@ -18,31 +18,48 @@ async function detectShopDomainCheckout(query: any): Promise<string> {
   console.log('🔍 Checkout - Attempting to detect shop domain via GraphQL...');
   
   try {
-    const result = await query(`query { shop { myshopifyDomain } }`);
-    const domain = (result as any)?.data?.shop?.myshopifyDomain;
+    const result = await query(`query { shop { id name } }`);
+    const shopId = (result as any)?.data?.shop?.id;
+    const shopName = (result as any)?.data?.shop?.name;
     
-    if (domain) {
-      console.log('✅ Checkout - Shop domain from GraphQL:', domain);
-      const domainLower = String(domain).toLowerCase();
+    console.log('🔑 Checkout - Shop ID:', shopId);
+    console.log('🔑 Checkout - Shop Name:', shopName);
+    
+    // Detectar por Shop ID (más confiable)
+    const SHOP_ID_MAP: Record<string, string> = {
+      '66398322938': SUPPORTED_SHOPS.usa,    // divainusa - divain® America
+      '3715563635': SUPPORTED_SHOPS.spain,   // divaines - divain®
+      // Sandbox ID: Agregar aquí cuando se conozca
+    };
+    
+    if (shopId) {
+      const idMatch = shopId.match(/Shop\/(\d+)/);
+      const numericId = idMatch ? idMatch[1] : null;
       
-      // Validar que sea una de nuestras 3 tiendas
-      if (domainLower.includes('divainusa')) return SUPPORTED_SHOPS.usa;
-      if (domainLower.includes('divaines')) return SUPPORTED_SHOPS.spain;
-      if (domainLower.includes('sandbox')) return SUPPORTED_SHOPS.sandbox;
-      
-      if (domainLower === SUPPORTED_SHOPS.usa) return SUPPORTED_SHOPS.usa;
-      if (domainLower === SUPPORTED_SHOPS.spain) return SUPPORTED_SHOPS.spain;
-      if (domainLower === SUPPORTED_SHOPS.sandbox) return SUPPORTED_SHOPS.sandbox;
-      
-      console.error('❌ Checkout - Shop domain no soportado:', domain);
-      throw new Error(`Tienda no soportada: ${domain}`);
+      if (numericId && SHOP_ID_MAP[numericId]) {
+        console.log('✅ Checkout - Detected shop from ID:', numericId, '→', SHOP_ID_MAP[numericId]);
+        return SHOP_ID_MAP[numericId];
+      }
+    }
+    
+    // Fallback: detectar por nombre
+    if (shopName) {
+      const nameLower = String(shopName).toLowerCase();
+      if (nameLower.includes('america') || nameLower.includes('usa')) {
+        console.log('✅ Checkout - Detected USA from name');
+        return SUPPORTED_SHOPS.usa;
+      }
+      if (nameLower.includes('sandbox') || nameLower.includes('test')) {
+        console.log('✅ Checkout - Detected Sandbox from name');
+        return SUPPORTED_SHOPS.sandbox;
+      }
     }
   } catch (err: any) {
     console.error('❌ Checkout - GraphQL query failed:', err?.message || err);
     throw new Error(`No se pudo detectar la tienda: ${err?.message || 'error desconocido'}`);
   }
   
-  console.error('❌ Checkout - GraphQL no devolvió shop domain');
+  console.error('❌ Checkout - No se pudo detectar la tienda');
   throw new Error('No se pudo detectar la tienda en checkout');
 }
 

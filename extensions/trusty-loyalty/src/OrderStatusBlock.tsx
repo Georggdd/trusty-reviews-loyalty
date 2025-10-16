@@ -209,8 +209,9 @@ function LoyaltyWidget() {
       // Detectar por Shop ID (más confiable)
       // Shop IDs reales de las tiendas
       const SHOP_ID_MAP: Record<string, string> = {
-        '66398322938': SUPPORTED_SHOPS.usa,  // divainusa - divain® America
-        // Agregar aquí los IDs de Spain y Sandbox cuando los conozcamos
+        '66398322938': SUPPORTED_SHOPS.usa,    // divainusa - divain® America
+        '3715563635': SUPPORTED_SHOPS.spain,   // divaines - divain®
+        // Sandbox ID: Agregar aquí cuando se conozca
       };
       
       if (shopId) {
