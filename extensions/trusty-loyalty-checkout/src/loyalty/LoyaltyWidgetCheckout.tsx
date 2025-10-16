@@ -1,62 +1,51 @@
 import * as React from "react";
-import { Text, BlockStack, TextField, Button, useTranslate } from "@shopify/ui-extensions-react/checkout";
+import { Text, BlockStack, TextField, Button, useTranslate, useApi } from "@shopify/ui-extensions-react/checkout";
 
 // ====== CONFIG ======
-const EDGE_SIGN_LOYALTY_LINK = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/sign_loyalty_link";
-const EDGE_LOYALTY_BALANCE   = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/loyalty_balance"; // OK para saldo con token
-const EDGE_REDEEM_DISCOUNT   = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/redeem_discount_code"; // ⬅️ NUEVO
+const EDGE_SIGN_LOYALTY_LINK = "https://tizzlfjuosqfyefybdee.functions.supabase.co/sign_loyalty_link";
+const EDGE_LOYALTY_BALANCE   = "https://tizzlfjuosqfyefybdee.functions.supabase.co/loyalty_balance";
+const EDGE_REDEEM_DISCOUNT   = "https://tizzlfjuosqfyefybdee.functions.supabase.co/redeem_discount_code";
 // =====================
 
-function detectShopDomain(): string {
-  if (typeof window === "undefined") {
-    console.warn('⚠️ Window not available in checkout, using fallback');
-    return "sandboxdivain.myshopify.com";
-  }
+async function detectShopDomainCheckout(query: any): Promise<string> {
+  // Lista explícita de las 3 tiendas soportadas
+  const SUPPORTED_SHOPS = {
+    sandbox: 'sandboxdivain.myshopify.com',
+    usa: 'divainusa.myshopify.com',
+    spain: 'divaines.myshopify.com',
+  } as const;
 
-  const hostname = window.location.hostname;
-  const href = window.location.href;
-  console.log('🔍 Checkout: Detecting shop domain from:', { hostname, href });
+  console.log('🔍 Checkout - Attempting to detect shop domain via GraphQL...');
   
-  // Mapeo de dominios de checkout a tiendas
-  const customDomainMap: Record<string, string> = {
-    'checkout.divainparfums.co': 'divainusa.myshopify.com',
-    'checkout.divainparfums.com': 'divainusa.myshopify.com',
-    'checkout.divainparfums.es': 'divaines.myshopify.com',
-  };
-  
-  // 1. Check custom domain mapping first
-  if (customDomainMap[hostname]) {
-    console.log('✅ Shop domain from custom checkout domain:', customDomainMap[hostname]);
-    return customDomainMap[hostname];
-  }
-  
-  // 2. Si estamos en myshopify.com checkout
-  if (hostname.includes("myshopify.com")) {
-    const match = hostname.match(/([^.]+)\.myshopify\.com/);
-    if (match) {
-      const detected = `${match[1]}.myshopify.com`;
-      console.log('✅ Shop domain from checkout URL:', detected);
-      return detected;
+  try {
+    const result = await query(`query { shop { myshopifyDomain } }`);
+    const domain = (result as any)?.data?.shop?.myshopifyDomain;
+    
+    if (domain) {
+      console.log('✅ Checkout - Shop domain from GraphQL:', domain);
+      const domainLower = String(domain).toLowerCase();
+      
+      // Validar que sea una de nuestras 3 tiendas
+      if (domainLower.includes('divainusa')) return SUPPORTED_SHOPS.usa;
+      if (domainLower.includes('divaines')) return SUPPORTED_SHOPS.spain;
+      if (domainLower.includes('sandbox')) return SUPPORTED_SHOPS.sandbox;
+      
+      if (domainLower === SUPPORTED_SHOPS.usa) return SUPPORTED_SHOPS.usa;
+      if (domainLower === SUPPORTED_SHOPS.spain) return SUPPORTED_SHOPS.spain;
+      if (domainLower === SUPPORTED_SHOPS.sandbox) return SUPPORTED_SHOPS.sandbox;
+      
+      console.error('❌ Checkout - Shop domain no soportado:', domain);
+      throw new Error(`Tienda no soportada: ${domain}`);
     }
+  } catch (err: any) {
+    console.error('❌ Checkout - GraphQL query failed:', err?.message || err);
+    throw new Error(`No se pudo detectar la tienda: ${err?.message || 'error desconocido'}`);
   }
   
-  // 3. Intentar desde URL (puede tener pistas)
-  if (href.includes('divainusa')) {
-    console.log('✅ Shop domain inferred from URL content: divainusa');
-    return 'divainusa.myshopify.com';
-  }
-  if (href.includes('divaines')) {
-    console.log('✅ Shop domain inferred from URL content: divaines');
-    return 'divaines.myshopify.com';
-  }
-  
-  // Fallback
-  console.warn('⚠️ Using fallback shop domain in checkout');
-  return "sandboxdivain.myshopify.com";
+  console.error('❌ Checkout - GraphQL no devolvió shop domain');
+  throw new Error('No se pudo detectar la tienda en checkout');
 }
 
-
-// 👉 helper para formatear fechas a DD/MM/AAAA
 const pad2 = (n: number) => (n < 10 ? `0${n}` : `${n}`);
 function formatDateDDMMYYYY(iso?: string | null): string {
   if (!iso) return "";
@@ -66,7 +55,6 @@ function formatDateDDMMYYYY(iso?: string | null): string {
       return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
     }
   } catch {}
-  // Fallback si viene "YYYY-MM-DD"
   const [y, m, d] = String(iso).split("T")[0].split("-");
   if (y && m && d) return `${pad2(Number(d))}/${pad2(Number(m))}/${y}`;
   return String(iso);
@@ -85,8 +73,10 @@ type Props = { email: string };
 
 export function LoyaltyWidgetCheckout({ email }: Props) {
   const translate = useTranslate();
-  const [shopDomain] = React.useState(() => detectShopDomain());
-  
+  const api = useApi();
+  const query = (api as any).query;
+  const [shopDomain, setShopDomain] = React.useState<string | null>(null);
+
   const [state, setState] = React.useState({
     loading: true,
     balance: null as number | null,
@@ -96,13 +86,26 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
     generatedCode: null as string | null,
     amount: null as number | null,
     expiresAt: null as string | null,
-    // Points expiration
     expiringSoon: null as Array<{ expiration_date: string; points: number }> | null,
     totalExpiringSoon: null as number | null,
     loadingExpiration: false as boolean,
   });
 
+  React.useEffect(() => {
+    async function detect() {
+      try {
+        const d: string = await detectShopDomainCheckout(query);
+        setShopDomain(d);
+      } catch (err: any) {
+        const errorMsg = err?.message || translate('shopDomainNotDetected');
+        setState((s) => ({ ...s, loading: false, error: errorMsg }));
+      }
+    }
+    detect();
+  }, [query]);
+
   async function getTokenByEmail(mail: string): Promise<string> {
+    if (!shopDomain) throw new Error(translate('shopDomainNotDetected'));
     const url = new URL(EDGE_SIGN_LOYALTY_LINK);
     url.searchParams.set("shop_domain", shopDomain);
     url.searchParams.set("email", mail);
@@ -126,27 +129,33 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
 
   async function fetchPointsExpiration(mail: string) {
     try {
+      if (!shopDomain) throw new Error(translate('shopDomainNotDetected'));
       setState((prev) => ({ ...prev, loadingExpiration: true }));
-      
-      const url = new URL("https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/get_points_expiration");
+
+      const url = new URL("https://tizzlfjuosqfyefybdee.functions.supabase.co/get_points_expiration");
       const body = JSON.stringify({
         email: mail,
         shop_domain: shopDomain
       });
-      
+
+      console.log('📡 get_points_expiration (checkout) →', { email: mail, shop_domain: shopDomain });
+
       const res = await fetch(url.toString(), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body
       });
-      
+
+      const text = await res.text();
+      let json: any = null;
+      try { json = JSON.parse(text); } catch {}
+
       if (!res.ok) {
-        console.warn('fetchPointsExpiration failed:', res.status);
+        console.warn('❌ get_points_expiration FAIL (checkout)', { status: res.status, body: text });
         setState((prev) => ({ ...prev, loadingExpiration: false }));
         return;
       }
-      
-      const json = await res.json();
+
       if (json?.ok) {
         setState((prev) => ({
           ...prev,
@@ -158,7 +167,7 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
         setState((prev) => ({ ...prev, loadingExpiration: false }));
       }
     } catch (err) {
-      console.warn('fetchPointsExpiration error:', err);
+      console.warn('fetchPointsExpiration error (checkout):', err);
       setState((prev) => ({ ...prev, loadingExpiration: false }));
     }
   }
@@ -167,24 +176,20 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
     let cancelled = false;
     (async () => {
       try {
-        if (!email) {
-          setState((s) => ({ ...s, loading: true, error: null }));
-          return;
-        }
+        if (!email || !shopDomain) return;
         const balance = await fetchBalanceByEmail(email);
-        fetchPointsExpiration(email); // Load expiration in parallel (non-blocking)
+        fetchPointsExpiration(email); // paralelo (no bloqueante)
         if (!cancelled) setState((s) => ({ ...s, loading: false, balance, error: null }));
       } catch {
         if (!cancelled) setState((s) => ({ ...s, loading: false, error: translate('errorLoadBalance') }));
       }
     })();
-    return () => {
-      cancelled = true;
-    };
-  }, [email]);
+    return () => { cancelled = true; };
+  }, [email, shopDomain]);
 
   async function handleRedeem() {
     try {
+      if (!shopDomain) throw new Error(translate('shopDomainNotDetected'));
       setState((p) => ({ ...p, msg: null, generatedCode: null, amount: null, expiresAt: null }));
 
       const points = parseInt(state.points, 10);
@@ -194,10 +199,9 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
         return;
       }
 
-      // 1) Token por email
       const token = await getTokenByEmail(email);
 
-      // 2) Preflight con el endpoint nuevo (opcional pero útil para mensajes)
+      // Preflight
       {
         const preUrl = new URL(EDGE_REDEEM_DISCOUNT);
         preUrl.searchParams.set("preflight", "true");
@@ -211,10 +215,7 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
         const ok = preRes.ok && (pj?.ok === true || pj?.success === true || pj?.preflight === true);
         if (!ok) {
           const err = (pj?.error || "").toString();
-          if (err === "no_redemption_option") {
-            setState((p) => ({ ...p, msg: pj?.message || translate('errorRedemptionOption', { points }) }));
-            return;
-          }
+          if (err === "no_redemption_option") { setState((p) => ({ ...p, msg: pj?.message || translate('errorRedemptionOption', { points }) })); return; }
           if (err === "Insufficient points" || err === "insufficient_balance") {
             setState((p) => ({ ...p, msg: String(translate('errorInsufficientBalance', { available: pj?.available ?? pj?.currentBalance ?? "0" })) }));
             return;
@@ -223,7 +224,7 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
         }
       }
 
-      // 3) Canje real con el endpoint nuevo
+      // Canje real
       const redUrl = new URL(EDGE_REDEEM_DISCOUNT);
       redUrl.searchParams.set("shop", shopDomain);
       const redRes = await fetch(redUrl.toString(), {
@@ -236,27 +237,15 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
       const ok = redRes.ok && ((rj?.ok === true) || (rj?.success === true));
       if (!ok) {
         const err = (rj?.error || "").toString();
-        if (err === "no_redemption_option") {
-          setState((p) => ({ ...p, msg: rj.message || translate('errorRedemptionOption', { points }) }));
-          return;
-        }
-        if (err === "Insufficient points" || err === "INSUFFICIENT_BALANCE") {
-          setState((p) => ({ ...p, msg: String(translate('errorInsufficientBalance', { available: rj.available })) }));
-          return;
-        }
-        if (err === "invalid_token") {
-          setState((p) => ({ ...p, msg: translate('errorInvalidToken') }));
-          return;
-        }
+        if (err === "no_redemption_option") { setState((p) => ({ ...p, msg: rj.message || translate('errorRedemptionOption', { points }) })); return; }
+        if (err === "Insufficient points" || err === "INSUFFICIENT_BALANCE") { setState((p) => ({ ...p, msg: String(translate('errorInsufficientBalance', { available: rj.available })) })); return; }
+        if (err === "invalid_token") { setState((p) => ({ ...p, msg: translate('errorInvalidToken') })); return; }
         throw new Error(err || `HTTP ${redRes.status}`);
       }
 
-      // 4) Extrae datos (tolerante a claves antiguas/nuevas)
-      const code     = rj.discount_code ?? rj.code ?? null;
-      const amount   = typeof rj.amount === "number"
-                        ? rj.amount
-                        : (typeof rj.discount_amount === "number" ? rj.discount_amount : null);
-      const expires  = rj.expires_at ?? rj.expiry ?? null;
+      const code   = rj.discount_code ?? rj.code ?? null;
+      const amount = typeof rj.amount === "number" ? rj.amount : (typeof rj.discount_amount === "number" ? rj.discount_amount : null);
+      const expires = rj.expires_at ?? rj.expiry ?? null;
 
       setState((p) => ({
         ...p,
@@ -267,9 +256,8 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
         points: "",
       }));
 
-      // 5) Refrescar saldo y expiración
       const newBalance = await fetchBalanceByEmail(email);
-      fetchPointsExpiration(email); // Update expiration in parallel
+      fetchPointsExpiration(email);
       setState((p) => ({ ...p, balance: newBalance }));
     } catch (e: any) {
       setState((p) => ({ ...p, msg: e?.message || translate('errorRedeemGeneral') }));
@@ -283,7 +271,6 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
     <BlockStack spacing="loose">
       <Text>{translate('yourBalance', { balance: state.balance ?? 0 })}</Text>
 
-      {/* Points Expiration Section */}
       {!state.loadingExpiration && state.expiringSoon !== null && (
         <BlockStack spacing="tight">
           <Text size="small" emphasis="bold">⏰ {translate('pointsExpiring')}</Text>
@@ -291,17 +278,12 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
             <BlockStack spacing="extraTight">
               {state.expiringSoon.map((exp, idx) => (
                 <Text key={idx} size="small">
-                  {translate('expiringPoints', { 
-                    points: exp.points, 
-                    date: formatDateDDMMYYYY(exp.expiration_date) 
-                  })}
+                  {translate('expiringPoints', { points: exp.points, date: formatDateDDMMYYYY(exp.expiration_date) })}
                 </Text>
               ))}
             </BlockStack>
           ) : (
-            <Text size="small">
-              {translate('noPointsExpiring')}
-            </Text>
+            <Text size="small">{translate('noPointsExpiring')}</Text>
           )}
         </BlockStack>
       )}
@@ -321,12 +303,8 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
 
       {state.msg && state.generatedCode && (
         <BlockStack spacing="tight">
-          <Text>
-            {state.msg} <Text emphasis="bold">{state.generatedCode}</Text>
-          </Text>
-          {state.amount != null && (
-             <Text>{translate('expiresOn', { date: formatDateDDMMYYYY(state.expiresAt) })}</Text>
-            )}
+          <Text>{state.msg} <Text emphasis="bold">{state.generatedCode}</Text></Text>
+          {state.amount != null && <Text>{translate('expiresOn', { date: formatDateDDMMYYYY(state.expiresAt) })}</Text>}
         </BlockStack>
       )}
     </BlockStack>

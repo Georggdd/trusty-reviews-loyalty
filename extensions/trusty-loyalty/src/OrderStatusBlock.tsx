@@ -165,71 +165,115 @@ function LoyaltyWidget() {
   const SUPABASE_EDGE = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1";
   
   async function detectShopDomain(): Promise<string> {
-    if (typeof window === "undefined") {
-      console.warn('⚠️ Window not available, using fallback');
-      return "sandboxdivain.myshopify.com";
-    }
+    console.error('🚀 [DETECTSHOP] Function START - Version 2024-10-16-v3');
+    console.error('🚀 [DETECTSHOP] Query function available:', typeof query);
+    
+    // Lista explícita de las 3 tiendas soportadas
+    const SUPPORTED_SHOPS = {
+      sandbox: 'sandboxdivain.myshopify.com',
+      usa: 'divainusa.myshopify.com',
+      spain: 'divaines.myshopify.com',
+    } as const;
 
-    const hostname = window.location.hostname;
-    const href = window.location.href;
-    console.log('🔍 Detecting shop domain from:', { hostname, href });
+    console.error('🔍 [DETECTSHOP] Attempting to detect shop domain via GraphQL...');
     
-    // Mapeo de dominios personalizados a tiendas (PRIMERO porque es más confiable)
-    const customDomainMap: Record<string, string> = {
-      'account.divainparfums.co': 'divainusa.myshopify.com',
-      'account.divainparfums.com': 'divainusa.myshopify.com', 
-      'account.divainparfums.es': 'divaines.myshopify.com',
-    };
-    
-    console.log('🔍 Custom domain check:', { hostname, hasDomain: !!customDomainMap[hostname] });
-    
-    // 1. Check custom domain mapping first
-    if (customDomainMap[hostname]) {
-      console.log('✅ Shop domain from custom domain map:', customDomainMap[hostname]);
-      return customDomainMap[hostname];
-    }
-    
-    // 2. Extraer de URL si es myshopify.com
-    if (hostname.includes('.myshopify.com')) {
-      const match = hostname.match(/([^.]+)\.(?:account\.)?myshopify\.com/);
-      if (match) {
-        const detected = `${match[1]}.myshopify.com`;
-        console.log('✅ Shop domain from myshopify URL:', detected);
-        return detected;
-      }
-    }
-    
-    // 3. Intentar desde parámetros de URL (region_country puede dar pistas)
+    // Estrategia principal: GraphQL - Probar diferentes campos disponibles
     try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const regionCountry = urlParams.get('region_country');
-      if (regionCountry === 'US') {
-        console.log('✅ Shop domain inferred from region_country=US');
-        return 'divainusa.myshopify.com';
+      console.error('🔄 [DETECTSHOP] About to call GraphQL query...');
+      
+      // Intentar con diferentes campos que pueden existir en Customer Account API
+      const result = await query(`query { 
+        shop { 
+          id
+          name
+        } 
+      }`);
+      console.error('🔄 [DETECTSHOP] GraphQL query completed');
+      
+      // DEBUG: Log completo de lo que devuelve GraphQL
+      console.error('📋 [DETECTSHOP] GraphQL result:', JSON.stringify(result, null, 2));
+      
+      // Intentar extraer el dominio del shop.id (puede contener el domain)
+      const shopId = (result as any)?.data?.shop?.id;
+      const shopName = (result as any)?.data?.shop?.name;
+      console.error('🔑 [DETECTSHOP] Shop ID:', shopId);
+      console.error('🔑 [DETECTSHOP] Shop Name:', shopName);
+      
+      // El shop ID en Shopify suele ser: gid://shopify/Shop/XXXXXX
+      // Pero no contiene el domain. Necesitamos otra estrategia.
+      
+      // Intentar extraer el dominio del GID del customer (que ya tenemos)
+      const customerGid = runtimeGid;
+      console.error('🔑 [DETECTSHOP] Customer GID:', customerGid);
+      
+      // Detectar por Shop ID (más confiable)
+      // Shop IDs reales de las tiendas
+      const SHOP_ID_MAP: Record<string, string> = {
+        '66398322938': SUPPORTED_SHOPS.usa,  // divainusa - divain® America
+        // Agregar aquí los IDs de Spain y Sandbox cuando los conozcamos
+      };
+      
+      if (shopId) {
+        // Extraer número del GID: gid://shopify/Shop/66398322938
+        const idMatch = shopId.match(/Shop\/(\d+)/);
+        const numericId = idMatch ? idMatch[1] : null;
+        
+        if (numericId && SHOP_ID_MAP[numericId]) {
+          console.error('✅ [DETECTSHOP] Detected shop from ID:', numericId, '→', SHOP_ID_MAP[numericId]);
+          return SHOP_ID_MAP[numericId];
+        }
       }
-      if (regionCountry === 'ES') {
-        console.log('✅ Shop domain inferred from region_country=ES');
-        return 'divaines.myshopify.com';
+      
+      // Fallback: detectar por nombre de tienda
+      if (shopName) {
+        const nameLower = String(shopName).toLowerCase();
+        console.error('🔍 [DETECTSHOP] Attempting detection by name:', nameLower);
+        
+        if (nameLower.includes('america') || nameLower.includes('usa')) {
+          console.error('✅ [DETECTSHOP] Detected USA shop from name');
+          return SUPPORTED_SHOPS.usa;
+        }
+        if (nameLower.includes('spain') || nameLower.includes('españa') || nameLower.includes('espana')) {
+          console.error('✅ [DETECTSHOP] Detected Spain shop from name');
+          return SUPPORTED_SHOPS.spain;
+        }
+        if (nameLower.includes('sandbox') || nameLower.includes('test')) {
+          console.error('✅ [DETECTSHOP] Detected Sandbox shop from name');
+          return SUPPORTED_SHOPS.sandbox;
+        }
       }
-    } catch (err) {
-      console.warn('⚠️ Could not parse URL params:', err);
-    }
-    
-    // 4. Último intento con GraphQL (puede no funcionar en Customer Account)
-    try {
-      const result = await query(`query { shop { myshopifyDomain } }`);
-      const domain = (result as any)?.data?.shop?.myshopifyDomain;
+      
+      const domain = null; // Ya no usamos myshopifyDomain
+      
+      // DEBUG: Log específico del dominio
+      console.error('🔑 [DETECTSHOP] Extracted domain:', domain);
+      
       if (domain) {
         console.log('✅ Shop domain from GraphQL:', domain);
-        return domain;
+        const domainLower = String(domain).toLowerCase();
+        
+        // Validar que sea una de nuestras 3 tiendas
+        if (domainLower.includes('divainusa')) return SUPPORTED_SHOPS.usa;
+        if (domainLower.includes('divaines')) return SUPPORTED_SHOPS.spain;
+        if (domainLower.includes('sandbox')) return SUPPORTED_SHOPS.sandbox;
+        
+        // Si es uno de nuestros dominios exactos, devolverlo
+        if (domainLower === SUPPORTED_SHOPS.usa) return SUPPORTED_SHOPS.usa;
+        if (domainLower === SUPPORTED_SHOPS.spain) return SUPPORTED_SHOPS.spain;
+        if (domainLower === SUPPORTED_SHOPS.sandbox) return SUPPORTED_SHOPS.sandbox;
+        
+        console.error('❌ Shop domain no soportado:', domain);
+        throw new Error(`Tienda no soportada: ${domain}. Tiendas válidas: divainusa, divaines, sandboxdivain`);
       }
-    } catch (err) {
-      console.warn('⚠️ GraphQL shop query failed (expected in Customer Account):', err);
+    } catch (err: any) {
+      console.error('❌ [DETECTSHOP] GraphQL query FAILED:', err?.message || err);
+      console.error('❌ [DETECTSHOP] Full error object:', err);
+      throw new Error(`No se pudo detectar la tienda via GraphQL: ${err?.message || 'error desconocido'}`);
     }
     
-    // Último fallback
-    console.warn('⚠️ Using fallback shop domain: sandboxdivain.myshopify.com');
-    return "sandboxdivain.myshopify.com";
+    // Si llegamos aquí, GraphQL no devolvió nada
+    console.error('❌ [DETECTSHOP] GraphQL no devolvió shop domain (reached end of function)');
+    throw new Error('No se pudo detectar la tienda: GraphQL no devolvió información del shop');
   }
 
   async function fetchBalance(usedGid: string | null, shopDomain: string) {
@@ -339,7 +383,7 @@ function LoyaltyWidget() {
 
       try {
         // Detectar shop domain primero
-        const detectedShopDomain = await detectShopDomain();
+        const detectedShopDomain: string = await detectShopDomain();
         notes.push(`Shop domain detectado: ${detectedShopDomain}`);
         
         if (!cancelled) {
@@ -475,12 +519,14 @@ function LoyaltyWidget() {
             },
           }));
         }
-      } catch {
+      } catch (err: any) {
         if (!cancelled) {
+          // Mostrar el error específico (ej: error de detección de tienda)
+          const errorMsg = err?.message || translate('errorLoadBalance');
           setState((prev) => ({
             ...prev,
             loading: false,
-            error: translate('errorLoadBalance'),
+            error: errorMsg,
           }));
         }
       }
