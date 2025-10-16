@@ -10,5 +10,10 @@
   "errorInsufficientBalance": "Insufficient balance. You have {{available}} points.",
   "errorRedemptionOption": "No redemption option for {{points}} points.",
   "errorInvalidToken": "Invalid token. Re-enter your email or refresh the page.",
-  "errorRedeemGeneral": "Error redeeming."
+  "errorRedeemGeneral": "Error redeeming.",
+  "pointsExpiring": "Points Expiration",
+  "expiringPoints": "{{points}} points expiring on {{date}}",
+  "noPointsExpiring": "No points expiring in the next 30 days",
+  "loadingExpiration": "Loading expiration dates…",
+  "totalExpiringSoon": "{{points}} points expiring soon"
 }

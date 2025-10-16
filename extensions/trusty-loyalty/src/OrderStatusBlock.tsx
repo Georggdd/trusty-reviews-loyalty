@@ -117,6 +117,10 @@ function LoyaltyWidget() {
     dobMsg: string | null;
     existingDob: string | null;
     shopDomain: string | null;
+    // Points expiration
+    expiringSoon: Array<{ expiration_date: string; points: number }> | null;
+    totalExpiringSoon: number | null;
+    loadingExpiration: boolean;
     debug: {
       runtimeGid: string | null;
       runtimeNumeric: string | null;
@@ -143,6 +147,10 @@ function LoyaltyWidget() {
     dobMsg: null,
     existingDob: null,
     shopDomain: null,
+    // Points expiration
+    expiringSoon: null,
+    totalExpiringSoon: null,
+    loadingExpiration: false,
     debug: {
       runtimeGid,
       runtimeNumeric,
@@ -157,7 +165,6 @@ function LoyaltyWidget() {
   const SUPABASE_EDGE = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1";
   
   async function detectShopDomain(): Promise<string> {
-    // 🚨 TEMPORAL: Forzar detección para testing
     if (typeof window === "undefined") {
       console.warn('⚠️ Window not available, using fallback');
       return "sandboxdivain.myshopify.com";
@@ -174,7 +181,6 @@ function LoyaltyWidget() {
       'account.divainparfums.es': 'divaines.myshopify.com',
     };
     
-    // 🚨 TEMPORAL: Verificar detección con logs extra
     console.log('🔍 Custom domain check:', { hostname, hasDomain: !!customDomainMap[hostname] });
     
     // 1. Check custom domain mapping first
@@ -278,6 +284,51 @@ function LoyaltyWidget() {
     }
   }
 
+  async function fetchPointsExpiration(usedGid: string | null, shopDomain: string) {
+    try {
+      setState((prev) => ({ ...prev, loadingExpiration: true }));
+      
+      const { numeric } = normalizeCustomerId(usedGid);
+      if (!numeric) return;
+      
+      const url = new URL(`${SUPABASE_EDGE}/get_points_expiration`);
+      const body = JSON.stringify({
+        customer_id: numeric,
+        shop_domain: shopDomain
+      });
+      
+      console.log('📡 Fetching points expiration with:', { customer_id: numeric, shop_domain: shopDomain });
+      
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+      });
+      
+      if (!res.ok) {
+        console.warn('fetchPointsExpiration failed:', res.status);
+        setState((prev) => ({ ...prev, loadingExpiration: false }));
+        return;
+      }
+      
+      const json = await res.json();
+      if (json?.ok) {
+        setState((prev) => ({
+          ...prev,
+          expiringSoon: json.expiring_soon || [],
+          totalExpiringSoon: json.total_expiring_soon || 0,
+          loadingExpiration: false
+        }));
+        console.log('✅ Points expiration loaded:', json.expiring_soon);
+      } else {
+        setState((prev) => ({ ...prev, loadingExpiration: false }));
+      }
+    } catch (err) {
+      console.warn('fetchPointsExpiration error:', err);
+      setState((prev) => ({ ...prev, loadingExpiration: false }));
+    }
+  }
+
   React.useEffect(() => {
     let cancelled = false;
 
@@ -310,6 +361,9 @@ function LoyaltyWidget() {
             dobMsg: null,
             existingDob: null,
             shopDomain: detectedShopDomain,
+            expiringSoon: null,
+            totalExpiringSoon: null,
+            loadingExpiration: false,
             debug: {
               runtimeGid: runtimeGid,
               runtimeNumeric: runtimeNumeric,
@@ -375,6 +429,9 @@ function LoyaltyWidget() {
               dobMsg: null,
               existingDob: null,
               shopDomain: detectedShopDomain,
+              expiringSoon: null,
+              totalExpiringSoon: null,
+              loadingExpiration: false,
               debug: {
                 runtimeGid: runtimeGid,
                 runtimeNumeric: runtimeNumeric,
@@ -394,7 +451,11 @@ function LoyaltyWidget() {
           return;
         }
 
-        await Promise.all([fetchBalance(usedGid, detectedShopDomain), fetchExistingDob(usedGid, detectedShopDomain)]);
+        await Promise.all([
+          fetchBalance(usedGid, detectedShopDomain),
+          fetchExistingDob(usedGid, detectedShopDomain),
+          fetchPointsExpiration(usedGid, detectedShopDomain)
+        ]);
 
         if (!cancelled) {
           setState((prev) => ({
@@ -498,8 +559,9 @@ function LoyaltyWidget() {
   
       const token = await getTokenForCustomer(usedGidLocal);
   
+      // 🚨 TEMPORARY: Always use debug=1 to see full Shopify response
       const redRes = await fetch(
-        `${SUPABASE_EDGE}/redeem_discount_code?shop=${state.shopDomain}`,
+        `${SUPABASE_EDGE}/redeem_discount_code?shop=${state.shopDomain}&debug=1`,
         { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: formEncode({ token, points }) }
       );
       const rj = await redRes.json().catch(() => ({} as any));
@@ -507,6 +569,16 @@ function LoyaltyWidget() {
       const ok = redRes.ok && ((rj?.ok === true) || (rj?.success === true));
       if (!ok) {
         const err = (rj?.error || "").toString();
+        
+        // 🚨 TEMPORARY: Log full error response to console
+        console.error('❌ Redeem failed:', {
+          status: redRes.status,
+          error: rj?.error,
+          message: rj?.message,
+          debug: rj?.debug,
+          fullResponse: rj
+        });
+        
         if (err === "no_redemption_option") { 
           setState((p) => ({ ...p, msg: rj.message || translate('errorRedemptionOption') })); 
           return; 
@@ -525,7 +597,10 @@ function LoyaltyWidget() {
           setState((p) => ({ ...p, msg: translate('errorInvalidToken') })); 
           return; 
         }
-        throw new Error(err || `HTTP ${redRes.status}`);
+        
+        // Show full error message including debug info
+        const debugInfo = rj?.debug ? JSON.stringify(rj.debug, null, 2) : '';
+        throw new Error(`${err || `HTTP ${redRes.status}`} ${rj?.message || ''} ${debugInfo}`.trim());
       }
   
       const code = rj.discount_code ?? rj.code ?? null;
@@ -535,7 +610,10 @@ function LoyaltyWidget() {
       setState((prev) => ({ ...prev, msg: null, generatedCode: code, amount, expiresAt, points: "" }));
   
       if (state.shopDomain) {
-        await fetchBalance(usedGidLocal, state.shopDomain);
+        await Promise.all([
+          fetchBalance(usedGidLocal, state.shopDomain),
+          fetchPointsExpiration(usedGidLocal, state.shopDomain)
+        ]);
       }
     } catch (e: any) {
       setState((prev) => ({ ...prev, msg: e?.message || translate('errorRedeemGeneral') }));
@@ -656,6 +734,29 @@ function LoyaltyWidget() {
                   </Text>
                 </BlockStack>
               </InlineStack>
+
+              {/* Points Expiration Section */}
+              {!state.loadingExpiration && state.expiringSoon !== null && (
+                <BlockStack spacing="extraTight">
+                  <Text emphasis="bold" size="small">⏰ {translate('pointsExpiring')}</Text>
+                  {state.expiringSoon.length > 0 ? (
+                    <BlockStack spacing="extraTight">
+                      {state.expiringSoon.map((exp, idx) => (
+                        <Text key={idx} appearance="subdued" size="small">
+                          {translate('expiringPoints', { 
+                            points: exp.points, 
+                            date: formatDateDDMMYYYY(exp.expiration_date) 
+                          })}
+                        </Text>
+                      ))}
+                    </BlockStack>
+                  ) : (
+                    <Text appearance="subdued" size="small">
+                      {translate('noPointsExpiring')}
+                    </Text>
+                  )}
+                </BlockStack>
+              )}
 
               <Divider />
 

@@ -26,5 +26,10 @@
   "errorSaveDate": "Could not save",
   "previewMode": "You are in PREVIEW mode of the editor. Close the preview (Close preview) and open the customer account in a normal tab so there is a session.",
   "noSession": "Make sure you are NOT in preview and use https://shopify.com/…/account.",
-  "shopDomainNotDetected": "Shop domain not detected."
+  "shopDomainNotDetected": "Shop domain not detected.",
+  "pointsExpiring": "Points Expiration",
+  "expiringPoints": "{{points}} points expiring on {{date}}",
+  "noPointsExpiring": "No points expiring in the next 30 days",
+  "loadingExpiration": "Loading expiration dates…",
+  "totalExpiringSoon": "{{points}} points expiring soon"
 }

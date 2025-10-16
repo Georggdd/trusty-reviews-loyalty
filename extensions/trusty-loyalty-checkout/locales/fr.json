@@ -10,5 +10,10 @@
   "errorInsufficientBalance": "Solde insuffisant. Vous avez {{available}} points.",
   "errorRedemptionOption": "Aucune option d'échange pour {{points}} points.",
   "errorInvalidToken": "Jeton invalide. Saisissez à nouveau votre email ou actualisez la page.",
-  "errorRedeemGeneral": "Erreur lors de l'échange."
+  "errorRedeemGeneral": "Erreur lors de l'échange.",
+  "pointsExpiring": "Expiration des Points",
+  "expiringPoints": "{{points}} points expirent le {{date}}",
+  "noPointsExpiring": "Aucun point n'expire dans les 30 prochains jours",
+  "loadingExpiration": "Chargement des dates d'expiration…",
+  "totalExpiringSoon": "{{points}} points expirent bientôt"
 }

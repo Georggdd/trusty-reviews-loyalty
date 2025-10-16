@@ -26,5 +26,10 @@
   "errorSaveDate": "Impossible d'enregistrer",
   "previewMode": "Vous êtes en mode APERÇU de l'éditeur. Fermez l'aperçu et ouvrez le compte client dans un onglet normal.",
   "noSession": "Assurez-vous de NE PAS être en aperçu et d'utiliser https://shopify.com/…/account.",
-  "shopDomainNotDetected": "Domaine de la boutique non détecté."
+  "shopDomainNotDetected": "Domaine de la boutique non détecté.",
+  "pointsExpiring": "Expiration des Points",
+  "expiringPoints": "{{points}} points expirent le {{date}}",
+  "noPointsExpiring": "Aucun point n'expire dans les 30 prochains jours",
+  "loadingExpiration": "Chargement des dates d'expiration…",
+  "totalExpiringSoon": "{{points}} points expirent bientôt"
 }

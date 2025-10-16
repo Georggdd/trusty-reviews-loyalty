@@ -7,7 +7,6 @@ const EDGE_LOYALTY_BALANCE   = "https://tizzlfjuosqfyefybdee.supabase.co/functio
 const EDGE_REDEEM_DISCOUNT   = "https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/redeem_discount_code"; // ⬅️ NUEVO
 // =====================
 
-// Detecta el shop domain dinámicamente
 function detectShopDomain(): string {
   if (typeof window === "undefined") {
     console.warn('⚠️ Window not available in checkout, using fallback');
@@ -97,6 +96,10 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
     generatedCode: null as string | null,
     amount: null as number | null,
     expiresAt: null as string | null,
+    // Points expiration
+    expiringSoon: null as Array<{ expiration_date: string; points: number }> | null,
+    totalExpiringSoon: null as number | null,
+    loadingExpiration: false as boolean,
   });
 
   async function getTokenByEmail(mail: string): Promise<string> {
@@ -121,6 +124,45 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
     return typeof json?.balance === "number" ? json.balance : 0;
   }
 
+  async function fetchPointsExpiration(mail: string) {
+    try {
+      setState((prev) => ({ ...prev, loadingExpiration: true }));
+      
+      const url = new URL("https://tizzlfjuosqfyefybdee.supabase.co/functions/v1/get_points_expiration");
+      const body = JSON.stringify({
+        email: mail,
+        shop_domain: shopDomain
+      });
+      
+      const res = await fetch(url.toString(), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body
+      });
+      
+      if (!res.ok) {
+        console.warn('fetchPointsExpiration failed:', res.status);
+        setState((prev) => ({ ...prev, loadingExpiration: false }));
+        return;
+      }
+      
+      const json = await res.json();
+      if (json?.ok) {
+        setState((prev) => ({
+          ...prev,
+          expiringSoon: json.expiring_soon || [],
+          totalExpiringSoon: json.total_expiring_soon || 0,
+          loadingExpiration: false
+        }));
+      } else {
+        setState((prev) => ({ ...prev, loadingExpiration: false }));
+      }
+    } catch (err) {
+      console.warn('fetchPointsExpiration error:', err);
+      setState((prev) => ({ ...prev, loadingExpiration: false }));
+    }
+  }
+
   React.useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -130,6 +172,7 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
           return;
         }
         const balance = await fetchBalanceByEmail(email);
+        fetchPointsExpiration(email); // Load expiration in parallel (non-blocking)
         if (!cancelled) setState((s) => ({ ...s, loading: false, balance, error: null }));
       } catch {
         if (!cancelled) setState((s) => ({ ...s, loading: false, error: translate('errorLoadBalance') }));
@@ -224,8 +267,9 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
         points: "",
       }));
 
-      // 5) Refrescar saldo
+      // 5) Refrescar saldo y expiración
       const newBalance = await fetchBalanceByEmail(email);
+      fetchPointsExpiration(email); // Update expiration in parallel
       setState((p) => ({ ...p, balance: newBalance }));
     } catch (e: any) {
       setState((p) => ({ ...p, msg: e?.message || translate('errorRedeemGeneral') }));
@@ -238,6 +282,29 @@ export function LoyaltyWidgetCheckout({ email }: Props) {
   return (
     <BlockStack spacing="loose">
       <Text>{translate('yourBalance', { balance: state.balance ?? 0 })}</Text>
+
+      {/* Points Expiration Section */}
+      {!state.loadingExpiration && state.expiringSoon !== null && (
+        <BlockStack spacing="tight">
+          <Text size="small" emphasis="bold">⏰ {translate('pointsExpiring')}</Text>
+          {state.expiringSoon.length > 0 ? (
+            <BlockStack spacing="extraTight">
+              {state.expiringSoon.map((exp, idx) => (
+                <Text key={idx} size="small">
+                  {translate('expiringPoints', { 
+                    points: exp.points, 
+                    date: formatDateDDMMYYYY(exp.expiration_date) 
+                  })}
+                </Text>
+              ))}
+            </BlockStack>
+          ) : (
+            <Text size="small">
+              {translate('noPointsExpiring')}
+            </Text>
+          )}
+        </BlockStack>
+      )}
 
       <TextField
         label={translate('pointsToRedeem')}
