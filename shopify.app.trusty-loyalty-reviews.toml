@@ -16,7 +16,7 @@ redirect_urls = [
 
 # ⬇️ Scopes actualizados para loyalty
 [access_scopes]
-scopes = "read_customers,write_customers,read_price_rules,write_price_rules,read_discounts,write_discounts,write_draft_orders,read_draft_orders,read_orders"
+scopes = "read_customers,write_customers,read_price_rules,write_price_rules,read_discounts,write_discounts,write_draft_orders,read_draft_orders,read_orders,read_products,write_products"
 
 # ⬇️ App Proxy restaurado
 [app_proxy]
